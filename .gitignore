@@ -1,0 +1,23 @@
+# Credentials & secrets
+.credentials.json
+stats-cache.json
+
+# Session-specific (not portable)
+history.jsonl
+cache/
+debug/
+downloads/
+file-history/
+paste-cache/
+plans/
+session-env/
+session-state.md
+shell-snapshots/
+statsig/
+tasks/
+telemetry/
+todos/
+
+# Plugin cache (reinstallable)
+plugins/cache/
+plugins/install-counts-cache.json

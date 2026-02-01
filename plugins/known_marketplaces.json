@@ -1,0 +1,50 @@
+{
+  "claude-plugins-official": {
+    "source": {
+      "source": "github",
+      "repo": "anthropics/claude-plugins-official"
+    },
+    "installLocation": "~/.claude/plugins/marketplaces/claude-plugins-official",
+    "lastUpdated": "2026-02-01T09:04:01.524Z"
+  },
+  "superpowers-marketplace": {
+    "source": {
+      "source": "github",
+      "repo": "obra/superpowers-marketplace"
+    },
+    "installLocation": "~/.claude/plugins/marketplaces/superpowers-marketplace",
+    "lastUpdated": "2026-01-31T01:19:08.556Z"
+  },
+  "Mixedbread-Grep": {
+    "source": {
+      "source": "github",
+      "repo": "mixedbread-ai/mgrep"
+    },
+    "installLocation": "~/.claude/plugins/marketplaces/Mixedbread-Grep",
+    "lastUpdated": "2026-01-31T02:10:58.339Z"
+  },
+  "trailofbits": {
+    "source": {
+      "source": "github",
+      "repo": "trailofbits/skills"
+    },
+    "installLocation": "~/.claude/plugins/marketplaces/trailofbits",
+    "lastUpdated": "2026-01-31T02:53:03.698Z"
+  },
+  "ykdojo": {
+    "source": {
+      "source": "github",
+      "repo": "ykdojo/claude-code-tips"
+    },
+    "installLocation": "~/.claude/plugins/marketplaces/ykdojo",
+    "lastUpdated": "2026-01-31T03:09:08.950Z"
+  },
+  "claude-night-market": {
+    "source": {
+      "source": "github",
+      "repo": "athola/claude-night-market"
+    },
+    "installLocation": "~/.claude/plugins/marketplaces/claude-night-market",
+    "lastUpdated": "2026-01-31T03:30:04.367Z"
+  }
+}
