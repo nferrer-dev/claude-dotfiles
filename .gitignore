@@ -21,4 +21,5 @@ todos/
 # Plugin cache (reinstallable)
 plugins/cache/
 plugins/install-counts-cache.json
+plugins/installed_plugins.json
 projects/
