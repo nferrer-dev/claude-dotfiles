@@ -12,6 +12,10 @@ My [Claude Code](https://docs.anthropic.com/en/docs/claude-code) configuration â
 
 See [MANIFEST.md](MANIFEST.md) for the full inventory.
 
+## Prerequisites
+
+New to Claude Code? Follow the [official setup guide](https://code.claude.com/docs/en/setup) to install the CLI and authenticate before using this config.
+
 ## Install
 
 ```bash
