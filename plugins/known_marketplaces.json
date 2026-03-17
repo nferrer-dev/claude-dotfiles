@@ -46,5 +46,29 @@
     },
     "installLocation": "~/.claude/plugins/marketplaces/claude-night-market",
     "lastUpdated": "2026-01-31T03:30:04.367Z"
+  },
+  "cc-marketplace": {
+    "source": {
+      "source": "github",
+      "repo": "kenryu42/cc-marketplace"
+    },
+    "installLocation": "~/.claude/plugins/marketplaces/cc-marketplace",
+    "lastUpdated": "2026-03-17T04:40:56.697Z"
+  },
+  "thedotmack": {
+    "source": {
+      "source": "github",
+      "repo": "thedotmack/claude-mem"
+    },
+    "installLocation": "~/.claude/plugins/marketplaces/thedotmack",
+    "lastUpdated": "2026-03-17T04:41:16.363Z"
+  },
+  "claude-notifications-go": {
+    "source": {
+      "source": "github",
+      "repo": "777genius/claude-notifications-go"
+    },
+    "installLocation": "~/.claude/plugins/marketplaces/claude-notifications-go",
+    "lastUpdated": "2026-03-17T04:47:41.206Z"
   }
 }

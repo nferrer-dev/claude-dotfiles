@@ -4,6 +4,7 @@ stats-cache.json
 
 # Session-specific (not portable)
 history.jsonl
+bash-commands.log
 cache/
 debug/
 downloads/
@@ -22,4 +23,9 @@ todos/
 plugins/cache/
 plugins/install-counts-cache.json
 plugins/installed_plugins.json
+plugins/blocklist.json
 projects/
+sessions/
+
+# Node modules (installed by install.sh)
+skills/playwright-skill/node_modules/
