@@ -1,6 +1,8 @@
 # Credentials & secrets
 .credentials.json
 stats-cache.json
+*.env
+*.key
 
 # Session-specific (not portable)
 history.jsonl
@@ -27,5 +29,5 @@ plugins/blocklist.json
 projects/
 sessions/
 
-# Node modules (installed by install.sh)
-skills/playwright-skill/node_modules/
+# Node modules
+node_modules/

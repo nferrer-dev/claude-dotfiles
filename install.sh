@@ -17,11 +17,17 @@ warn()  { echo -e "${YELLOW}[warn]${NC} $*"; }
 err()   { echo -e "${RED}[error]${NC} $*"; }
 
 # ── Pre-flight ───────────────────────────────────────────────
-command -v claude >/dev/null 2>&1 || { err "claude CLI not found. Install it first: https://docs.anthropic.com/en/docs/claude-code"; exit 1; }
+command -v claude >/dev/null 2>&1 || { err "claude CLI not found. Install: https://docs.anthropic.com/en/docs/claude-code"; exit 1; }
 
 if [ ! -d "$CLAUDE_DIR" ]; then
   info "Creating ${CLAUDE_DIR}"
   mkdir -p "$CLAUDE_DIR"
+fi
+
+# Detect platform
+IS_WINDOWS=false
+if [[ "$(uname -s)" == MINGW* ]] || [[ "$(uname -s)" == MSYS* ]] || [[ "$(uname -o 2>/dev/null)" == "Msys" ]]; then
+  IS_WINDOWS=true
 fi
 
 # ── Backup existing config ───────────────────────────────────
@@ -46,7 +52,7 @@ info "Installing agents"
 mkdir -p "$CLAUDE_DIR/agents"
 cp "$REPO_DIR/agents/"*.md "$CLAUDE_DIR/agents/"
 
-info "Installing skills (35)"
+info "Installing skills (30)"
 mkdir -p "$CLAUDE_DIR/skills"
 cp -r "$REPO_DIR/skills/"* "$CLAUDE_DIR/skills/"
 
@@ -54,221 +60,243 @@ info "Installing commands"
 mkdir -p "$CLAUDE_DIR/commands"
 cp -r "$REPO_DIR/commands/"* "$CLAUDE_DIR/commands/"
 
-info "Installing plugin marketplace config"
-mkdir -p "$CLAUDE_DIR/plugins"
-cp "$REPO_DIR/plugins/known_marketplaces.json" "$CLAUDE_DIR/plugins/known_marketplaces.json"
+# ── Install hooks ────────────────────────────────────────────
+info "Installing hooks"
+mkdir -p "$CLAUDE_DIR/hooks/prompt-injection-defender"
+cp "$REPO_DIR/hooks/config-protection.sh" "$CLAUDE_DIR/hooks/config-protection.sh"
+chmod +x "$CLAUDE_DIR/hooks/config-protection.sh"
+cp "$REPO_DIR/hooks/prompt-injection-defender/post-tool-defender.py" "$CLAUDE_DIR/hooks/prompt-injection-defender/"
+cp "$REPO_DIR/hooks/prompt-injection-defender/patterns.yaml" "$CLAUDE_DIR/hooks/prompt-injection-defender/"
+
+# ── Install trace compactor ─────────────────────────────────
+info "Installing claude-tools (trace compactor)..."
+if command -v pip >/dev/null 2>&1; then
+  pip install git+https://github.com/tarekziade/claude-tools.git --quiet 2>/dev/null || warn "Failed to install claude-tools"
+elif command -v pip3 >/dev/null 2>&1; then
+  pip3 install git+https://github.com/tarekziade/claude-tools.git --quiet 2>/dev/null || warn "Failed to install claude-tools"
+else
+  warn "pip not found — install claude-tools manually: pip install git+https://github.com/tarekziade/claude-tools.git"
+fi
+
+# ── Windows: create python3 wrapper ─────────────────────────
+if $IS_WINDOWS; then
+  if ! command -v python3 >/dev/null 2>&1; then
+    info "Creating python3 wrapper for Windows"
+    cat > /usr/bin/python3 << 'PYEOF'
+#!/bin/bash
+exec python "$@"
+PYEOF
+    chmod +x /usr/bin/python3
+  fi
+fi
 
 # ── Install plugin marketplaces ──────────────────────────────
-info "Installing plugin marketplaces (requires network)..."
+info "Installing plugin marketplaces..."
 marketplaces=(
   "anthropics/claude-plugins-official"
   "obra/superpowers-marketplace"
-  "mixedbread-ai/mgrep"
   "trailofbits/skills"
   "ykdojo/claude-code-tips"
   "athola/claude-night-market"
   "kenryu42/cc-marketplace"
-  "thedotmack/claude-mem"
   "777genius/claude-notifications-go"
+  "gmickel/gmickel-claude-marketplace"
 )
 
 for repo in "${marketplaces[@]}"; do
   name=$(basename "$repo")
-  dest="$CLAUDE_DIR/plugins/marketplaces/$name"
-  if [ -d "$dest" ]; then
-    info "Updating marketplace: $name"
-    git -C "$dest" pull --quiet 2>/dev/null || warn "Failed to update $name"
-  else
-    info "Cloning marketplace: $name"
-    git clone --quiet "https://github.com/${repo}.git" "$dest" 2>/dev/null || warn "Failed to clone $name"
-  fi
+  info "  Adding marketplace: $name"
+  claude plugin marketplace remove "$name" 2>/dev/null || true
+  claude plugin marketplace add "$repo" 2>/dev/null || warn "Failed to add $name"
 done
+
+# ── Install plugins ──────────────────────────────────────────
+info "Installing plugins (11)..."
+plugins=(
+  "superpowers@claude-plugins-official"
+  "context7@claude-plugins-official"
+  "pyright-lsp@claude-plugins-official"
+  "hookify@claude-plugins-official"
+  "modern-python@trailofbits"
+  "property-based-testing@trailofbits"
+  "static-analysis@trailofbits"
+  "dx@ykdojo"
+  "sanctum@claude-night-market"
+  "claude-notifications-go@claude-notifications-go"
+  "flow-next@gmickel-claude-marketplace"
+)
+
+for plugin in "${plugins[@]}"; do
+  info "  Installing: $plugin"
+  claude plugin install "$plugin" 2>/dev/null || warn "Failed to install $plugin"
+done
+
+# ── Install MCP servers ──────────────────────────────────────
+echo ""
+info "Installing MCP servers..."
+
+# Detect Node.js
+if ! command -v node >/dev/null 2>&1 && ! command -v npx >/dev/null 2>&1; then
+  warn "Node.js not found. MCP servers require Node.js."
+  warn "Install: https://nodejs.org/ or 'winget install OpenJS.NodeJS.LTS'"
+else
+  # No-key servers (always install)
+  info "  Adding sequential-thinking MCP"
+  claude mcp add --scope user sequential-thinking -- cmd /c npx -y @modelcontextprotocol/server-sequential-thinking 2>/dev/null || true
+
+  info "  Adding playwright MCP"
+  claude mcp add --scope user playwright -- cmd /c npx -y @playwright/mcp@latest 2>/dev/null || true
+
+  info "  Adding context-mode MCP"
+  claude mcp add --scope user context-mode -- cmd /c npx -y context-mode 2>/dev/null || true
+
+  info "  Adding chrome-devtools MCP"
+  claude mcp add --scope user chrome-devtools -- cmd /c npx -y chrome-devtools-mcp@latest 2>/dev/null || true
+
+  info "  Adding yfinance MCP"
+  claude mcp add --scope user yfinance -- cmd /c npx -y yfinance-mcp 2>/dev/null || true
+
+  # Servers requiring API keys (prompt user)
+  echo ""
+  info "The following MCP servers require API keys."
+  info "Press Enter to skip any you don't have yet."
+  echo ""
+
+  # GitHub MCP
+  read -rp "GitHub PAT (or press Enter to use 'gh auth token'): " GITHUB_PAT
+  if [ -z "$GITHUB_PAT" ] && command -v gh >/dev/null 2>&1; then
+    GITHUB_PAT=$(gh auth token 2>/dev/null || echo "")
+  fi
+  if [ -n "$GITHUB_PAT" ]; then
+    claude mcp add --scope user github-mcp --env "GITHUB_PERSONAL_ACCESS_TOKEN=$GITHUB_PAT" -- cmd /c npx -y @modelcontextprotocol/server-github 2>/dev/null || true
+    ok "  github-mcp added"
+  else
+    warn "  Skipped github-mcp (no PAT)"
+  fi
+
+  # Tavily MCP (HTTP transport)
+  read -rp "Tavily API key: " TAVILY_KEY
+  if [ -n "$TAVILY_KEY" ]; then
+    claude mcp add --scope user --transport http tavily "https://mcp.tavily.com/mcp/?tavilyApiKey=${TAVILY_KEY}" 2>/dev/null || true
+    ok "  tavily added"
+  else
+    warn "  Skipped tavily"
+  fi
+
+  # Firecrawl MCP
+  read -rp "Firecrawl API key: " FIRECRAWL_KEY
+  if [ -n "$FIRECRAWL_KEY" ]; then
+    claude mcp add --scope user firecrawl --env "FIRECRAWL_API_KEY=$FIRECRAWL_KEY" -- cmd /c npx -y firecrawl-mcp 2>/dev/null || true
+    ok "  firecrawl added"
+  else
+    warn "  Skipped firecrawl"
+  fi
+
+  # Gemini MCP
+  read -rp "Gemini API key: " GEMINI_KEY
+  if [ -n "$GEMINI_KEY" ]; then
+    claude mcp add --scope user gemini --env "GEMINI_API_KEY=$GEMINI_KEY" -- cmd /c npx -y @rlabs-inc/gemini-mcp 2>/dev/null || true
+    ok "  gemini added"
+  else
+    warn "  Skipped gemini"
+  fi
+
+  # Codex MCP (OpenAI)
+  read -rp "OpenAI API key (for Codex MCP): " OPENAI_KEY
+  if [ -n "$OPENAI_KEY" ]; then
+    claude mcp add --scope user codex --env "CODEX_API_KEY=$OPENAI_KEY" --env "CODEX_API_BASE_URL=https://api.openai.com/v1" -- cmd /c npx -y @cpujia/codex-mcp-server 2>/dev/null || true
+    ok "  codex added"
+  else
+    warn "  Skipped codex"
+  fi
+
+  # Claude Context (Zilliz)
+  read -rp "OpenAI API key (for Zilliz embeddings, Enter to reuse above): " ZILLIZ_OPENAI_KEY
+  if [ -z "$ZILLIZ_OPENAI_KEY" ] && [ -n "${OPENAI_KEY:-}" ]; then
+    ZILLIZ_OPENAI_KEY="$OPENAI_KEY"
+  fi
+  if [ -n "$ZILLIZ_OPENAI_KEY" ]; then
+    read -rp "Zilliz endpoint URL: " ZILLIZ_URL
+    read -rp "Zilliz API token: " ZILLIZ_TOKEN
+    if [ -n "$ZILLIZ_URL" ] && [ -n "$ZILLIZ_TOKEN" ]; then
+      claude mcp add --scope user claude-context \
+        --env "OPENAI_API_KEY=$ZILLIZ_OPENAI_KEY" \
+        --env "MILVUS_ADDRESS=$ZILLIZ_URL" \
+        --env "MILVUS_TOKEN=$ZILLIZ_TOKEN" \
+        -- cmd /c npx -y @zilliz/claude-context-mcp@latest 2>/dev/null || true
+      ok "  claude-context added"
+    else
+      warn "  Skipped claude-context (missing endpoint or token)"
+    fi
+  else
+    warn "  Skipped claude-context"
+  fi
+
+  # Windows: add PATH env to all stdio MCP servers
+  if $IS_WINDOWS; then
+    info "Patching MCP servers with Windows PATH..."
+    python -c "
+import json, os
+config_path = os.path.expanduser('~/.claude.json')
+with open(config_path, 'r') as f:
+    config = json.load(f)
+node_path = r'C:\Program Files\nodejs;C:\WINDOWS\system32;C:\WINDOWS;C:\Program Files\Git\cmd'
+for name, server in config.get('mcpServers', {}).items():
+    if server.get('type') == 'stdio':
+        if 'env' not in server:
+            server['env'] = {}
+        server['env']['PATH'] = node_path
+with open(config_path, 'w') as f:
+    json.dump(config, f, indent=2)
+print('  PATH injected into all stdio MCP servers')
+" 2>/dev/null || warn "Failed to patch MCP PATH — may need manual fix"
+  fi
+fi
 
 # ── Node.js dependencies ─────────────────────────────────────
 echo ""
-info "Checking Node.js dependencies..."
-
-if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
-  # playwright-skill
-  if [ -f "$CLAUDE_DIR/skills/playwright-skill/package.json" ]; then
-    info "Installing playwright-skill node dependencies..."
-    (cd "$CLAUDE_DIR/skills/playwright-skill" && npm install --quiet 2>/dev/null) || warn "Failed to npm install for playwright-skill"
-    info "Installing Playwright Chromium browser..."
-    (cd "$CLAUDE_DIR/skills/playwright-skill" && npx playwright install chromium 2>/dev/null) || warn "Failed to install Chromium for Playwright"
-  fi
-else
-  warn "Node.js/npm not found. playwright-skill requires: npm install (in skills/playwright-skill/)"
-fi
-
-# Global npm packages (optional)
-npm_global_pkgs=()
-for pkg in "@mozilla/readability-cli" "pptxgenjs" "sharp"; do
-  if ! npm list -g "$pkg" >/dev/null 2>&1; then
-    npm_global_pkgs+=("$pkg")
-  fi
-done
-
-if [ ${#npm_global_pkgs[@]} -gt 0 ]; then
-  echo ""
-  warn "Optional global npm packages not installed: ${npm_global_pkgs[*]}"
-  read -rp "Install them now? (npm install -g ${npm_global_pkgs[*]}) [y/N] " answer
-  if [[ "$answer" =~ ^[Yy]$ ]]; then
-    npm install -g "${npm_global_pkgs[@]}" || warn "Some global npm packages failed to install"
-  else
-    warn "Skipped. Install later: npm install -g ${npm_global_pkgs[*]}"
-  fi
+info "Pre-caching MCP npm packages..."
+if command -v npm >/dev/null 2>&1; then
+  npm install -g \
+    @modelcontextprotocol/server-github \
+    @modelcontextprotocol/server-sequential-thinking \
+    firecrawl-mcp \
+    @playwright/mcp \
+    context-mode \
+    chrome-devtools-mcp \
+    @rlabs-inc/gemini-mcp \
+    @cpujia/codex-mcp-server \
+    yfinance-mcp \
+    @zilliz/claude-context-mcp \
+    2>/dev/null || warn "Some npm packages failed to pre-cache"
 fi
 
 # ── Python dependencies ──────────────────────────────────────
 echo ""
 info "Checking Python dependencies..."
 
-# Core packages used across multiple skills
 core_python_pkgs=(
-  httpx
-  requests
-  pandas
-  numpy
-  matplotlib
-  seaborn
-  scikit-learn
-  plotly
-  polars
-  networkx
-  statsmodels
-  sympy
-  scipy
-  arviz
-  pymc
-  shap
-  openpyxl
-  pypdf
-  pdfplumber
-  reportlab
-  pingouin
-  duckdb
-  edgartools
-  kaleido
-  huggingface_hub
+  httpx requests pandas numpy matplotlib seaborn scikit-learn
+  plotly polars networkx statsmodels sympy scipy arviz pymc
+  shap openpyxl pypdf pdfplumber reportlab pingouin duckdb
+  edgartools kaleido huggingface_hub
 )
 
 missing_pkgs=()
 for pkg in "${core_python_pkgs[@]}"; do
-  # Normalize package name for import check (hyphens -> underscores)
   import_name="${pkg//-/_}"
-  # Special cases
   case "$pkg" in
     scikit-learn) import_name="sklearn" ;;
-    pypdf) import_name="pypdf" ;;
-    huggingface_hub) import_name="huggingface_hub" ;;
     edgartools) import_name="edgar" ;;
   esac
-  python3 -c "import $import_name" 2>/dev/null || missing_pkgs+=("$pkg")
+  python -c "import $import_name" 2>/dev/null || missing_pkgs+=("$pkg")
 done
 
 if [ ${#missing_pkgs[@]} -gt 0 ]; then
-  echo ""
-  warn "Missing core Python packages (${#missing_pkgs[@]}): ${missing_pkgs[*]}"
-  read -rp "Install them now? (pip install ${missing_pkgs[*]}) [y/N] " answer
+  warn "Missing Python packages (${#missing_pkgs[@]}): ${missing_pkgs[*]}"
+  read -rp "Install them now? [y/N] " answer
   if [[ "$answer" =~ ^[Yy]$ ]]; then
-    pip install "${missing_pkgs[@]}" || warn "Some packages failed to install"
-  else
-    warn "Skipped. Install later: pip install ${missing_pkgs[*]}"
-  fi
-fi
-
-# Optional/heavy Python packages
-echo ""
-info "Checking optional Python packages..."
-
-optional_python_pkgs=()
-optional_labels=()
-
-# timesfm (large, requires torch)
-python3 -c "import timesfm" 2>/dev/null || {
-  optional_python_pkgs+=("timesfm[torch]")
-  optional_labels+=("timesfm — time series forecasting (requires PyTorch)")
-}
-
-# torch
-python3 -c "import torch" 2>/dev/null || {
-  optional_python_pkgs+=("torch")
-  optional_labels+=("torch — PyTorch (large download)")
-}
-
-# xgboost
-python3 -c "import xgboost" 2>/dev/null || {
-  optional_python_pkgs+=("xgboost")
-  optional_labels+=("xgboost — gradient boosting")
-}
-
-# mlflow
-python3 -c "import mlflow" 2>/dev/null || {
-  optional_python_pkgs+=("mlflow")
-  optional_labels+=("mlflow — experiment tracking")
-}
-
-# dash
-python3 -c "import dash" 2>/dev/null || {
-  optional_python_pkgs+=("dash")
-  optional_labels+=("dash — interactive dashboards")
-}
-
-# yt-dlp
-command -v yt-dlp >/dev/null 2>&1 || {
-  optional_python_pkgs+=("yt-dlp")
-  optional_labels+=("yt-dlp — YouTube transcript downloads")
-}
-
-# defusedxml
-python3 -c "import defusedxml" 2>/dev/null || {
-  optional_python_pkgs+=("defusedxml")
-  optional_labels+=("defusedxml — safe XML parsing for xlsx/pptx")
-}
-
-# markitdown
-python3 -c "import markitdown" 2>/dev/null || {
-  optional_python_pkgs+=("markitdown[pptx]")
-  optional_labels+=("markitdown — document conversion for pptx")
-}
-
-# pdf2image + pytesseract
-python3 -c "import pdf2image" 2>/dev/null || {
-  optional_python_pkgs+=("pdf2image")
-  optional_labels+=("pdf2image — PDF to image conversion")
-}
-python3 -c "import pytesseract" 2>/dev/null || {
-  optional_python_pkgs+=("pytesseract")
-  optional_labels+=("pytesseract — OCR for scanned PDFs")
-}
-
-# joblib
-python3 -c "import joblib" 2>/dev/null || {
-  optional_python_pkgs+=("joblib")
-  optional_labels+=("joblib — model persistence for scikit-learn")
-}
-
-if [ ${#optional_python_pkgs[@]} -gt 0 ]; then
-  echo ""
-  warn "Optional Python packages not installed:"
-  for label in "${optional_labels[@]}"; do
-    echo -e "  ${YELLOW}-${NC} $label"
-  done
-  read -rp "Install all optional packages? [y/N] " answer
-  if [[ "$answer" =~ ^[Yy]$ ]]; then
-    pip install "${optional_python_pkgs[@]}" || warn "Some optional packages failed to install"
-  else
-    warn "Skipped. Install individually as needed."
-  fi
-fi
-
-# notebooklm skill has its own requirements.txt (patchright)
-if [ -f "$CLAUDE_DIR/skills/notebooklm/requirements.txt" ]; then
-  echo ""
-  read -rp "Install NotebookLM skill dependencies? (patchright + chrome) [y/N] " answer
-  if [[ "$answer" =~ ^[Yy]$ ]]; then
-    pip install -r "$CLAUDE_DIR/skills/notebooklm/requirements.txt"
-    python3 -m patchright install chrome 2>/dev/null || warn "Failed to install Chrome for patchright"
+    pip install "${missing_pkgs[@]}" || warn "Some packages failed"
   fi
 fi
 
@@ -276,89 +304,76 @@ fi
 echo ""
 info "Checking system dependencies..."
 
-# jq is required for hooks — auto-install if missing
 if ! command -v jq >/dev/null 2>&1; then
   info "jq not found — required for hooks. Installing..."
   if command -v apt-get >/dev/null 2>&1; then
-    sudo apt-get install -y jq 2>/dev/null || warn "Failed to install jq via apt"
+    sudo apt-get install -y jq 2>/dev/null || warn "Failed to install jq"
   elif command -v brew >/dev/null 2>&1; then
-    brew install jq 2>/dev/null || warn "Failed to install jq via brew"
-  elif command -v winget >/dev/null 2>&1 || command -v winget.exe >/dev/null 2>&1; then
-    winget.exe install jqlang.jq --accept-package-agreements --accept-source-agreements 2>/dev/null || warn "Failed to install jq via winget"
-    # On Windows, ensure jq is accessible from bash
-    jq_winget="$HOME/AppData/Local/Microsoft/WinGet/Links/jq.exe"
-    if [ -f "$jq_winget" ] && ! command -v jq >/dev/null 2>&1; then
-      mkdir -p "$HOME/bin"
-      cp "$jq_winget" "$HOME/bin/jq.exe"
-      info "Copied jq to ~/bin for bash PATH access"
-    fi
+    brew install jq 2>/dev/null || warn "Failed to install jq"
+  elif command -v winget.exe >/dev/null 2>&1; then
+    winget.exe install jqlang.jq --accept-package-agreements --accept-source-agreements 2>/dev/null || warn "Failed to install jq"
   else
-    warn "Could not auto-install jq. Install manually: https://jqlang.github.io/jq/download/"
+    warn "Install jq manually: https://jqlang.github.io/jq/download/"
   fi
 fi
 
-sys_missing=()
-command -v jq >/dev/null 2>&1    || sys_missing+=("jq — required for hooks (install failed)")
-command -v bc >/dev/null 2>&1    || sys_missing+=("bc — used by statusline for cost calculation (optional)")
-command -v git >/dev/null 2>&1   || sys_missing+=("git — required for plugin marketplaces")
-command -v tesseract >/dev/null 2>&1 || sys_missing+=("tesseract — OCR engine for pytesseract (optional)")
-
-if [ ${#sys_missing[@]} -gt 0 ]; then
-  warn "System packages not found:"
-  for pkg in "${sys_missing[@]}"; do
-    echo -e "  ${YELLOW}-${NC} $pkg"
-  done
+if ! command -v uv >/dev/null 2>&1; then
+  info "uv not found — required for prompt injection defender. Installing..."
+  pip install uv 2>/dev/null || warn "Failed to install uv. Install manually: pip install uv"
 fi
 
 # ── Install settings.local.json (permissions) ────────────────
 if [ ! -f "$CLAUDE_DIR/settings.local.json" ]; then
-  info "Installing settings.local.json (auto-allow non-destructive operations)"
+  info "Installing settings.local.json"
   cp "$REPO_DIR/settings.local.json.template" "$CLAUDE_DIR/settings.local.json"
-elif ! grep -q '"Bash(\*)"' "$CLAUDE_DIR/settings.local.json" 2>/dev/null; then
-  echo ""
-  warn "Your settings.local.json doesn't have broad Bash permissions."
-  read -rp "Replace with auto-allow template? (existing file backed up) [y/N] " answer
-  if [[ "$answer" =~ ^[Yy]$ ]]; then
-    cp "$CLAUDE_DIR/settings.local.json" "$CLAUDE_DIR/settings.local.json.bak.$(date +%s)"
-    cp "$REPO_DIR/settings.local.json.template" "$CLAUDE_DIR/settings.local.json"
-    ok "settings.local.json updated"
-  fi
 fi
 
-# ── Optional API keys ────────────────────────────────────────
-echo ""
-info "API keys status:"
-echo ""
-
-check_key() {
-  local var="$1" skill="$2" url="$3"
-  if [ -z "${!var:-}" ]; then
-    echo -e "  ${YELLOW}${var}${NC} — used by ${skill}"
-    echo -e "    Get one at: ${CYAN}${url}${NC}"
-  else
-    echo -e "  ${GREEN}${var}${NC} — already set ✓"
+# ── Hookify patch (Windows) ──────────────────────────────────
+if $IS_WINDOWS; then
+  info "Patching hookify hooks for Windows (PLUGIN_ROOT fallback)..."
+  HOOKIFY_DIR="$CLAUDE_DIR/plugins/cache/claude-plugins-official/hookify"
+  if [ -d "$HOOKIFY_DIR" ]; then
+    for version_dir in "$HOOKIFY_DIR"/*/hooks; do
+      for f in "$version_dir"/{stop,pretooluse,posttooluse,userpromptsubmit}.py; do
+        if [ -f "$f" ]; then
+          sed -i "s|PLUGIN_ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT')|PLUGIN_ROOT = os.environ.get('CLAUDE_PLUGIN_ROOT') or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))|" "$f" 2>/dev/null
+        fi
+      done
+    done
+    ok "  Hookify patched"
   fi
-}
-
-check_key "GEMINI_API_KEY"     "deep-research"          "https://aistudio.google.com/"
-check_key "HF_TOKEN"           "hugging-face-datasets"  "https://huggingface.co/settings/tokens"
-check_key "COMPOSIO_API_KEY"   "connect-apps"           "https://composio.dev/"
-check_key "ALPHA_VANTAGE_API_KEY" "alpha-vantage"       "https://www.alphavantage.co/support/#api-key"
-check_key "FRED_API_KEY"       "fred-economic-data"     "https://fred.stlouisfed.org/docs/api/api_key.html"
-check_key "FINNHUB_API_KEY"    "finnhub MCP server"     "https://finnhub.io/"
+fi
 
 # ── Summary ──────────────────────────────────────────────────
 echo ""
 ok "Installation complete!"
 echo ""
 echo "Installed:"
-echo "  - settings.json (permissions, hooks, env, statusline, plugins)"
-echo "  - CLAUDE.md (global workflow principles)"
+echo "  - settings.json (permissions, hooks, env, plugins)"
+echo "  - CLAUDE.md (global workflow + model routing rules)"
 echo "  - statusline-command.sh (token/cost/git status bar)"
 echo "  - 2 agents (general-code-reviewer, security-reviewer)"
-echo "  - 35 skills"
+echo "  - 30 skills (finance, ML, viz, research, dev)"
 echo "  - 1 command (orchestrate)"
-echo "  - 9 plugin marketplaces"
-echo "  - 15 enabled plugins"
+echo "  - 8 plugin marketplaces"
+echo "  - 11 plugins"
+echo "  - 13 hooks (security, quality, trace compaction)"
+echo "  - 11 MCP servers (key-dependent ones only if keys provided)"
 echo ""
-echo "Run 'claude' to start using your new configuration."
+echo "  Hooks:"
+echo "    - UserPromptSubmit: Python traceback compactor"
+echo "    - PreToolUse (Edit): Config protection (blocks linter config edits)"
+echo "    - PreToolUse (Bash): 5 destructive command blockers"
+echo "    - PostToolUse (Bash): Command logger + trace compactor + injection defender"
+echo "    - PostToolUse (Read/WebFetch/Grep/Task): Prompt injection defender"
+echo ""
+echo "  MCP Servers:"
+echo "    - sequential-thinking, playwright, context-mode, chrome-devtools, yfinance"
+echo "    - github-mcp, tavily, firecrawl, gemini, codex, claude-context (if keys provided)"
+echo ""
+if $IS_WINDOWS; then
+  warn "Windows users: ensure C:\\Program Files\\nodejs is in your system PATH"
+  warn "  Settings > 'environment variables' > User Path > Add 'C:\\Program Files\\nodejs'"
+fi
+echo ""
+echo "Run 'claude' to start using your configuration."

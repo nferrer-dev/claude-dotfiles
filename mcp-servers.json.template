@@ -1,0 +1,97 @@
+{
+  "_comment": "MCP server configuration template. Copy relevant sections into ~/.claude.json mcpServers. Replace YOUR_*_KEY placeholders with actual API keys.",
+  "mcpServers": {
+    "tavily": {
+      "type": "http",
+      "url": "https://mcp.tavily.com/mcp/?tavilyApiKey=YOUR_TAVILY_API_KEY"
+    },
+    "sequential-thinking": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "env": {
+        "PATH": "C:\\Program Files\\nodejs;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\Program Files\\Git\\cmd"
+      }
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@playwright/mcp@latest"],
+      "env": {
+        "PATH": "C:\\Program Files\\nodejs;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\Program Files\\Git\\cmd"
+      }
+    },
+    "context-mode": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "context-mode"],
+      "env": {
+        "PATH": "C:\\Program Files\\nodejs;C:\\WINDOWS\\system32;C\\WINDOWS;C:\\Program Files\\Git\\cmd"
+      }
+    },
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "chrome-devtools-mcp@latest"],
+      "env": {
+        "PATH": "C:\\Program Files\\nodejs;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\Program Files\\Git\\cmd"
+      }
+    },
+    "yfinance": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "yfinance-mcp"],
+      "env": {
+        "PATH": "C:\\Program Files\\nodejs;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\Program Files\\Git\\cmd"
+      }
+    },
+    "firecrawl": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "firecrawl-mcp"],
+      "env": {
+        "FIRECRAWL_API_KEY": "YOUR_FIRECRAWL_API_KEY",
+        "PATH": "C:\\Program Files\\nodejs;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\Program Files\\Git\\cmd"
+      }
+    },
+    "gemini": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@rlabs-inc/gemini-mcp"],
+      "env": {
+        "GEMINI_API_KEY": "YOUR_GEMINI_API_KEY",
+        "PATH": "C:\\Program Files\\nodejs;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\Program Files\\Git\\cmd"
+      }
+    },
+    "codex": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@cpujia/codex-mcp-server"],
+      "env": {
+        "CODEX_API_KEY": "YOUR_OPENAI_API_KEY",
+        "CODEX_API_BASE_URL": "https://api.openai.com/v1",
+        "PATH": "C:\\Program Files\\nodejs;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\Program Files\\Git\\cmd"
+      }
+    },
+    "claude-context": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@zilliz/claude-context-mcp@latest"],
+      "env": {
+        "OPENAI_API_KEY": "YOUR_OPENAI_API_KEY",
+        "MILVUS_ADDRESS": "YOUR_ZILLIZ_ENDPOINT",
+        "MILVUS_TOKEN": "YOUR_ZILLIZ_TOKEN",
+        "PATH": "C:\\Program Files\\nodejs;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\Program Files\\Git\\cmd"
+      }
+    },
+    "github-mcp": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "YOUR_GITHUB_PAT",
+        "PATH": "C:\\Program Files\\nodejs;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\Program Files\\Git\\cmd"
+      }
+    }
+  }
+}

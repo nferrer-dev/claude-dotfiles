@@ -12,25 +12,33 @@
 - For complex problems, throw more compute at it via subagents
 - One task per subagent for focused execution
 
-### 3. Self-Improvement Loop
+### 3. Model Routing
+- **Claude Opus (default)**: Primary coding, architecture, complex reasoning
+- **Claude Sonnet/Haiku (subagents)**: Use `model: "sonnet"` or `model: "haiku"` for simple subagent tasks (search, file reads, formatting)
+- **Gemini MCP**: Deep research tasks, analyzing files >200K tokens (1M context window), cross-referencing large codebases
+- **Codex MCP**: Second opinion on code — use when stuck or want an alternative approach from GPT
+- **Tavily MCP**: Quick factual web searches
+- **Firecrawl MCP**: Deep web scraping, extracting structured data from sites
+
+### 4. Self-Improvement Loop
 - After ANY correction from the user: update tasks/lessons.md with the pattern
 - Write rules for yourself that prevent the same mistake
 - Ruthlessly iterate on these lessons until mistake rate drops
 - Review lessons at session start for relevant project
 
-### 4. Verification Before Done
+### 5. Verification Before Done
 - Never mark a task complete without proving it works
 - Diff behavior between main and your changes when relevant
 - Ask yourself: "Would a staff engineer approve this?"
 - Run tests, check logs, demonstrate correctness
 
-### 5. Demand Elegance (Balanced)
+### 6. Demand Elegance (Balanced)
 - For non-trivial changes: pause and ask "is there a more elegant way?"
 - If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
 - Skip this for simple, obvious fixes -- don't over-engineer
 - Challenge your own work before presenting it
 
-### 6. Autonomous Bug Fixing
+### 7. Autonomous Bug Fixing
 - When given a bug report: just fix it. Don't ask for hand-holding
 - Point at logs, errors, failing tests -- then resolve them
 - Zero context switching required from the user
