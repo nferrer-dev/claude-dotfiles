@@ -20,25 +20,33 @@
 - **Tavily MCP**: Quick factual web searches
 - **Firecrawl MCP**: Deep web scraping, extracting structured data from sites
 
-### 4. Self-Improvement Loop
+### 4. Interface Switching
+- Two interfaces: **desktop** (Claude Code CLI) and **telegram** (@claude_njf_bot)
+- Only the **primary interface** accepts input — the other is blocked
+- `/telegram` in Claude Code: generates synopsis, sends to Telegram, switches primary, attaches session
+- `/desktop` in Telegram: generates synopsis, saves handoff file, switches primary back
+- Session IDs persist across switches via `~/.claude/primary-interface.json`
+- If Claude Code closes without `/desktop`, the next `/telegram` re-attaches the new session
+
+### 5. Self-Improvement Loop
 - After ANY correction from the user: update tasks/lessons.md with the pattern
 - Write rules for yourself that prevent the same mistake
 - Ruthlessly iterate on these lessons until mistake rate drops
 - Review lessons at session start for relevant project
 
-### 5. Verification Before Done
+### 6. Verification Before Done
 - Never mark a task complete without proving it works
 - Diff behavior between main and your changes when relevant
 - Ask yourself: "Would a staff engineer approve this?"
 - Run tests, check logs, demonstrate correctness
 
-### 6. Demand Elegance (Balanced)
+### 7. Demand Elegance (Balanced)
 - For non-trivial changes: pause and ask "is there a more elegant way?"
 - If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
 - Skip this for simple, obvious fixes -- don't over-engineer
 - Challenge your own work before presenting it
 
-### 7. Autonomous Bug Fixing
+### 8. Autonomous Bug Fixing
 - When given a bug report: just fix it. Don't ask for hand-holding
 - Point at logs, errors, failing tests -- then resolve them
 - Zero context switching required from the user
