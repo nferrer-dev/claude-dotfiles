@@ -30,6 +30,6 @@ curl -s -X POST "https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/sendMessage
 python C:\Users\nferr\OneDrive\Documents\Projects\claude-telegram-bot\bot.py &
 ```
 
-6. Tell me: "Telegram is now primary with session [ID]. Continue on @claude_njf_bot. Send /desktop there to switch back."
+6. Tell me: "Telegram is now primary with session [ID]. Continue on @YOUR_BOT_USERNAME. Send /desktop there to switch back."
 
 NOTE: If a previous session was attached and never detached, this command replaces it with the current session.
