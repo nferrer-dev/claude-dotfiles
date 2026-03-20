@@ -46,6 +46,8 @@
       "Bash(curl *| sh*)",
       "Bash(git push --force*)",
       "Bash(git push *--force*)",
+      "Bash(git push -f*)",
+      "Bash(git push *-f *)",
       "Bash(git reset --hard*)",
       "Bash(git clean -f*)",
       "Bash(git checkout -- *)",
@@ -109,6 +111,15 @@
     "PreToolUse": [
       {
         "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/config-protection.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
         "hooks": [
           {
             "type": "command",

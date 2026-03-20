@@ -40,11 +40,13 @@ assert_count()   {
   assert "$dir has $expected $pattern files (found $actual)" test "$actual" -eq "$expected"
 }
 
-# ── Stub out claude CLI so pre-flight passes ─────────────────
+# ── Stub out external tools so install doesn't modify system state ──
 stub_bin="$FAKE_HOME/bin"
 mkdir -p "$stub_bin"
-echo '#!/bin/sh' > "$stub_bin/claude"
-chmod +x "$stub_bin/claude"
+for cmd in claude npm npx pip pip3 uv; do
+  echo '#!/bin/sh' > "$stub_bin/$cmd"
+  chmod +x "$stub_bin/$cmd"
+done
 
 # ── Test 1: Fresh install ────────────────────────────────────
 echo "== Test: Fresh install =="

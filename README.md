@@ -5,19 +5,20 @@ My [Claude Code](https://docs.anthropic.com/en/docs/claude-code) configuration â
 ## What's included
 
 ### Settings (`settings.json`)
-- 52 deny rules (destructive ops, credential files, force pushes, device access)
+- 54 deny rules (destructive ops, credential files, force pushes, device access)
 - 20 allow rules for power-user workflow
 - Agent teams enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`)
 - Effort level locked to `high`
 - Statusline with token/cost/git info
 
-### Hooks (15 hook commands)
+### Hooks (16 hook commands)
 | Event | Hook | Purpose |
 |-------|------|---------|
 | UserPromptSubmit | interface-guard.sh | Blocks desktop input when Telegram is primary |
 | UserPromptSubmit | trace compactor | Auto-compacts Python tracebacks in prompts |
 | PreToolUse (Edit) | config-protection.sh | Blocks edits to linter/formatter configs |
-| PreToolUse (Bash) | 5 inline blockers | rm -rf, git push main, kill, rmdir, wsl |
+| PreToolUse (Write) | config-protection.sh | Blocks overwrites of linter/formatter configs |
+| PreToolUse (Bash) | 5 inline blockers | rm -rf, git push main/force, kill, rmdir, wsl |
 | PostToolUse (Bash) | command logger | Timestamps all bash commands to log file |
 | PostToolUse (Bash) | trace compactor | Compacts tracebacks in command output |
 | PostToolUse (5 matchers) | injection defender | Scans Read/WebFetch/Bash/Grep/Task for prompt injection |
