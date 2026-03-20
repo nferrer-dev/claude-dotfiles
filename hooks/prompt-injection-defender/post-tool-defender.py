@@ -327,6 +327,10 @@ def main() -> None:
         # No content or too short to contain meaningful injection
         sys.exit(0)
 
+    # Cap scan length to avoid timeout on large files (5s hook timeout)
+    MAX_SCAN_LENGTH = 100_000
+    text = text[:MAX_SCAN_LENGTH]
+
     # Scan for injection patterns
     detections = scan_for_injections(text, config)
 
