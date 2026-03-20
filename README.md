@@ -11,9 +11,10 @@ My [Claude Code](https://docs.anthropic.com/en/docs/claude-code) configuration �
 - Effort level locked to `high`
 - Statusline with token/cost/git info
 
-### Hooks (13 total)
+### Hooks (16 hook commands)
 | Event | Hook | Purpose |
 |-------|------|---------|
+| UserPromptSubmit | interface-guard.sh | Blocks desktop input when Telegram is primary |
 | UserPromptSubmit | trace compactor | Auto-compacts Python tracebacks in prompts |
 | PreToolUse (Edit) | config-protection.sh | Blocks edits to linter/formatter configs |
 | PreToolUse (Bash) | 5 inline blockers | rm -rf, git push main, kill, rmdir, wsl |
@@ -47,9 +48,18 @@ superpowers, context7, pyright-lsp, hookify, modern-python, property-based-testi
 **Research:** article-extractor, tapestry, youtube-transcript, deep-research, notebooklm, langsmith-fetch, hugging-face-datasets
 **Dev:** verification-loop, iterative-retrieval, skill-creator, mcp-builder
 
+### Commands (4)
+- `/orchestrate` — sequential agent workflow for complex tasks
+- `/telegram` — switch primary interface to Telegram bot
+- `/desktop` — switch back to Claude Code desktop
+- `/update` — sync CLAUDE.md and context docs with session changes
+
 ### Agents (2)
 - general-code-reviewer — broad quality/security/maintainability review
 - security-reviewer — OWASP Top 10, secrets detection, input validation
+
+### Telegram Bot (`telegram-bot/`)
+Multi-module bot for controlling Claude Code from Telegram — named sessions, SQLite queue, HITL permission buttons, parallel git worktree execution, streaming responses, health watchdog.
 
 ## Installation
 
@@ -92,6 +102,75 @@ The install script prompts for keys interactively. No keys are stored in this re
 
 ### MCP server template
 See `mcp-servers.json.template` for the full MCP configuration with placeholder keys. Useful for manual setup or non-Windows platforms.
+
+## Telegram Bot
+
+The `telegram-bot/` directory contains a multi-module bot for controlling Claude Code sessions from Telegram.
+
+### Setup
+
+1. Create a bot via [@BotFather](https://t.me/BotFather) on Telegram and copy the token
+2. Create `telegram-bot/.secrets.json`:
+   ```json
+   {"bot_token": "YOUR_BOT_TOKEN", "user_id": YOUR_TELEGRAM_USER_ID}
+   ```
+   Or set environment variables: `TELEGRAM_BOT_TOKEN` and `TELEGRAM_USER_ID`
+3. Install dependencies: `pip install requests`
+4. Start the bot: `python telegram-bot/bot.py`
+
+### Commands
+
+| Command | Description |
+|---------|-------------|
+| `/sessions` | List all sessions with status |
+| `/register <name> <path>` | Register a project directory as a named session |
+| `/switch <name>` | Set default routing target |
+| `/close <name>` | Kill a session's psmux process |
+| `/yolo [name]` | Toggle auto-approve permissions for a session |
+| `/queue` | Show pending messages per session |
+| `/history <name> [count]` | Show recent conversation history |
+| `/health` | Show worker, session, and queue status |
+| `/desktop` | Switch primary interface back to Claude Code |
+
+**Message routing:** Prefix with `#name` to target a specific session (e.g., `#umwelt fix the auth bug`), or just type to send to the active session.
+
+### Parallel Mode (Git Worktrees)
+
+| Command | Description |
+|---------|-------------|
+| `/parallel [name]` | Enable parallel mode — each message spawns a worktree |
+| `/serial [name]` | Disable parallel mode |
+| `/branches [name]` | List worktree branches with running status |
+| `/diff <task>` | Show `--stat` diff for a task branch vs main |
+| `/merge <task>` | Merge task branch into main, clean up |
+| `/discard <task>` | Remove worktree and branch without merging |
+
+### Permission Handling (HITL)
+
+When Claude requests a tool permission, the bot sends an inline keyboard to Telegram:
+- **Approve** — allow this one action
+- **Deny** — block this action
+- **Approve All** — allow all actions for this session
+- **YOLO mode** — auto-approve everything (restarts session with `--permission-mode auto`)
+
+Permissions time out after 5 minutes (auto-denied).
+
+### Watchdog
+
+`telegram-bot/watchdog.py` monitors the bot via a health file and restarts it if stale. Register as a Windows scheduled task:
+```bash
+schtasks /create /tn "ClaudeBotWatchdog" /tr "python /path/to/telegram-bot/watchdog.py" /sc minute /mo 5
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TELEGRAM_BOT_TOKEN` | — | Bot token from BotFather |
+| `TELEGRAM_USER_ID` | — | Your Telegram user ID (authorization) |
+| `PSMUX_PATH` | `~/AppData/Local/.../psmux.exe` | Path to psmux binary |
+| `CLAUDE_PATH` | `~/.local/bin/claude.exe` | Path to Claude Code binary |
+| `WORKTREE_BRANCH_PREFIX` | `parallel/` | Git branch prefix for parallel tasks |
 
 ## Windows Notes
 - MCP servers use `cmd /c npx` wrapper (required on Windows)
