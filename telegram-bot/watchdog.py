@@ -1,7 +1,7 @@
-r"""Watchdog for Claude Telegram Bot — restarts if health check is stale.
+"""Watchdog for Claude Telegram Bot — restarts if health check is stale.
 
 Run as a Windows Scheduled Task every 5 minutes:
-  schtasks /create /tn "ClaudeBotWatchdog" /tr "python C:\Users\nferr\OneDrive\Documents\Projects\claude-telegram-bot\watchdog.py" /sc minute /mo 5
+  schtasks /create /tn "ClaudeBotWatchdog" /tr "python /path/to/watchdog.py" /sc minute /mo 5
 
 Or run continuously:
   python watchdog.py --loop

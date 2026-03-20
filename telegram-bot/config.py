@@ -15,8 +15,10 @@ if (not BOT_TOKEN or not ALLOWED_USER_ID) and SECRETS_FILE.exists():
     ALLOWED_USER_ID = ALLOWED_USER_ID or int(_secrets.get("user_id", "0"))
 
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
-PSMUX = r"C:\Users\nferr\AppData\Local\Microsoft\WinGet\Links\psmux.exe"
-CLAUDE = r"C:\Users\nferr\.local\bin\claude.exe"
+
+# Tool paths — override via env vars if not in default locations
+PSMUX = os.environ.get("PSMUX_PATH", str(Path.home() / "AppData/Local/Microsoft/WinGet/Links/psmux.exe"))
+CLAUDE = os.environ.get("CLAUDE_PATH", str(Path.home() / ".local/bin/claude.exe"))
 MODE_FILE = Path.home() / ".claude" / "primary-interface.json"
 DB_PATH = Path.home() / ".claude" / "telegram-bot.db"
 

@@ -1,10 +1,11 @@
 """Git worktree operations for parallel Claude sessions."""
 
+import os
 import subprocess
 from pathlib import Path
 
 WORKTREE_DIR = Path.home() / ".claude" / "worktrees"
-BRANCH_PREFIX = "the_box/nferr/"
+BRANCH_PREFIX = os.environ.get("WORKTREE_BRANCH_PREFIX", "parallel/")
 
 
 def _git(repo_path: str, *args, check: bool = False) -> subprocess.CompletedProcess:

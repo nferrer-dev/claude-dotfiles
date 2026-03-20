@@ -1,5 +1,6 @@
 """psmux session management for Claude Code instances."""
 
+import os
 import re
 import subprocess
 import time
@@ -224,7 +225,7 @@ class PsmuxSession:
             return True
         if "ctrl+" in line.lower() or "Press up" in line:
             return True
-        if line.startswith("Opus") or line.startswith("nferr"):
+        if line.startswith("Opus") or line.startswith(os.environ.get("USER", "")):
             return True
         if "effort" in line and "/" in line:
             return True
