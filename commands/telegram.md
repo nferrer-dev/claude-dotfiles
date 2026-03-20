@@ -27,7 +27,7 @@ curl -s -X POST "https://api.telegram.org/botYOUR_TELEGRAM_BOT_TOKEN/sendMessage
 
 5. Start the Telegram bot in the background if not already running:
 ```bash
-python C:\Users\nferr\OneDrive\Documents\Projects\claude-telegram-bot\bot.py &
+python telegram-bot/bot.py &
 ```
 
 6. Tell me: "Telegram is now primary with session [ID]. Continue on @YOUR_BOT_USERNAME. Send /desktop there to switch back."
