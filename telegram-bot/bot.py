@@ -104,6 +104,14 @@ def api_call(method, payload=None):
     for attempt in range(3):
         try:
             r = http.post(f"{API_URL}/{method}", json=payload or {}, timeout=10)
+            if r.status_code == 429:
+                retry_after = r.json().get("parameters", {}).get("retry_after", 5)
+                log.warning(f"Rate limited on {method}, retrying in {retry_after}s")
+                time.sleep(retry_after)
+                continue
+            if r.status_code >= 500:
+                time.sleep(2 ** attempt)
+                continue
             return r.json()
         except Exception as e:
             if attempt < 2:
