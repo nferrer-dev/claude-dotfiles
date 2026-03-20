@@ -50,7 +50,7 @@ chmod +x "$stub_bin/claude"
 echo "== Test: Fresh install =="
 
 HOME="$FAKE_HOME" PATH="$stub_bin:$PATH" \
-  bash "$REPO_DIR/install.sh" <<< $'n\nn\nn\nn\nn' 2>&1 | sed 's/^/  | /'
+  bash "$REPO_DIR/install.sh" <<< $'\n\n\n\n\n\n\n\n\n' 2>&1 | sed 's/^/  | /'
 
 echo ""
 echo "-- Verifying file structure --"
@@ -134,7 +134,7 @@ echo ""
 echo "== Test: Re-install backs up settings.json =="
 
 HOME="$FAKE_HOME" PATH="$stub_bin:$PATH" \
-  bash "$REPO_DIR/install.sh" <<< $'n\nn\nn\nn\nn' 2>&1 | sed 's/^/  | /'
+  bash "$REPO_DIR/install.sh" <<< $'\n\n\n\n\n\n\n\n\n' 2>&1 | sed 's/^/  | /'
 
 backup_count=$(find "$FAKE_HOME/.claude" -maxdepth 1 -name 'settings.json.bak.*' | wc -l)
 assert "backup file created (found $backup_count)" test "$backup_count" -ge 1
@@ -144,7 +144,7 @@ echo ""
 echo "== Test: Idempotent (no errors on third run) =="
 
 HOME="$FAKE_HOME" PATH="$stub_bin:$PATH" \
-  bash "$REPO_DIR/install.sh" <<< $'n\nn\nn\nn\nn' 2>&1 | sed 's/^/  | /'
+  bash "$REPO_DIR/install.sh" <<< $'\n\n\n\n\n\n\n\n\n' 2>&1 | sed 's/^/  | /'
 
 assert "exit code 0" true
 
