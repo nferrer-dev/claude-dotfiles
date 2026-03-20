@@ -21,7 +21,7 @@
 - **Firecrawl MCP**: Deep web scraping, extracting structured data from sites
 
 ### 4. Interface Switching
-- Two interfaces: **desktop** (Claude Code CLI) and **telegram** (@claude_njf_bot)
+- Two interfaces: **desktop** (Claude Code CLI) and **telegram** (via Telegram bot)
 - Only the **primary interface** accepts input — the other is blocked
 - `/telegram` in Claude Code: generates synopsis, sends to Telegram, switches primary, attaches session
 - `/desktop` in Telegram: generates synopsis, saves handoff file, switches primary back

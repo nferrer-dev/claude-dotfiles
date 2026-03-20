@@ -1,5 +1,6 @@
 # Credentials & secrets
 .credentials.json
+.secrets.json
 stats-cache.json
 *.env
 *.key
@@ -28,6 +29,9 @@ plugins/installed_plugins.json
 plugins/blocklist.json
 projects/
 sessions/
+
+# Python
+__pycache__/
 
 # Node modules
 node_modules/
