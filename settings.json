@@ -48,6 +48,7 @@
       "Bash(git push *--force*)",
       "Bash(git push -f*)",
       "Bash(git push *-f *)",
+      "Bash(git push * -f)",
       "Bash(git reset --hard*)",
       "Bash(git clean -f*)",
       "Bash(git checkout -- *)",
@@ -102,7 +103,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.prompt' | PYTHONIOENCODING=utf-8 claude-trace-compactor --stdin | jq -Rs '{\"updatedPrompt\": .}'",
+            "command": "bash -c 'set -o pipefail; jq -r .prompt | PYTHONIOENCODING=utf-8 claude-trace-compactor --stdin | jq -Rs \"{\\\"updatedPrompt\\\": .}\"'",
             "timeout": 10
           }
         ]
@@ -163,7 +164,7 @@
           },
           {
             "type": "command",
-            "command": "jq -r '.tool_response.stdout // \"\"' | PYTHONIOENCODING=utf-8 claude-trace-compactor --stdin | jq -Rs '{\"hookSpecificOutput\": {\"hookEventName\": \"PostToolUse\", \"updatedResponse\": {\"stdout\": .}}}'",
+            "command": "bash -c 'set -o pipefail; jq -r \".tool_response.stdout // \\\"\\\"\" | PYTHONIOENCODING=utf-8 claude-trace-compactor --stdin | jq -Rs \"{\\\"hookSpecificOutput\\\": {\\\"hookEventName\\\": \\\"PostToolUse\\\", \\\"updatedResponse\\\": {\\\"stdout\\\": .}}}\"'",
             "timeout": 10
           }
         ]
