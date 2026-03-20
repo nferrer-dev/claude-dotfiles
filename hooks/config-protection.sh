@@ -18,8 +18,11 @@ fi
 
 # pyproject.toml / setup.cfg edits targeting tool config sections
 if echo "$FILE" | grep -qiE '(pyproject\.toml|setup\.cfg|tox\.ini)$'; then
+  # Edit tool uses new_string, Write tool uses content
   NEW_STRING=$(echo "$INPUT" | jq -r '.tool_input.new_string // ""')
-  if echo "$NEW_STRING" | grep -qiE '\[(tool\.(ruff|pylint|flake8|mypy|black|isort|pytest)|pylint|flake8)'; then
+  CONTENT=$(echo "$INPUT" | jq -r '.tool_input.content // ""')
+  CHECK_TEXT="${NEW_STRING}${CONTENT}"
+  if echo "$CHECK_TEXT" | grep -qiE '\[(tool\.(ruff|pylint|flake8|mypy|black|isort|pytest)|pylint|flake8)'; then
     echo "BLOCKED: Do not modify linter/formatter sections in $FILE — fix the code instead" >&2
     exit 2
   fi

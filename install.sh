@@ -324,12 +324,6 @@ if ! command -v uv >/dev/null 2>&1; then
   pip install uv 2>/dev/null || warn "Failed to install uv. Install manually: pip install uv"
 fi
 
-# ── Install settings.local.json (permissions) ────────────────
-if [ ! -f "$CLAUDE_DIR/settings.local.json" ]; then
-  info "Installing settings.local.json"
-  cp "$REPO_DIR/settings.local.json.template" "$CLAUDE_DIR/settings.local.json"
-fi
-
 # ── Hookify patch (Windows) ──────────────────────────────────
 if $IS_WINDOWS; then
   info "Patching hookify hooks for Windows (PLUGIN_ROOT fallback)..."
