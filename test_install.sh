@@ -71,13 +71,12 @@ assert_file "agents/general-code-reviewer.md"
 assert_file "agents/security-reviewer.md"
 assert_count "agents" "*.md" 2
 
-# skills (37 skill dirs)
+# skills (30 skill dirs)
 skills=(
-  alpha-vantage article-extractor connect-apps context-optimization
-  deep-research docx edgartools exploratory-data-analysis
-  fred-economic-data hedgefundmonitor hugging-face-datasets
-  iterative-retrieval langsmith-fetch matplotlib mcp-builder
-  networkx notebooklm pdf playwright-skill plotly polars pptx
+  alpha-vantage article-extractor deep-research edgartools
+  exploratory-data-analysis fred-economic-data hedgefundmonitor
+  hugging-face-datasets iterative-retrieval langsmith-fetch
+  matplotlib mcp-builder networkx notebooklm pdf plotly polars
   pymc scikit-learn seaborn shap skill-creator statistical-analysis
   statsmodels sympy tapestry timesfm-forecasting verification-loop
   xlsx youtube-transcript
@@ -98,12 +97,6 @@ assert_dir  "skills/deep-research/scripts"
 # hugging-face-datasets extras
 assert_dir  "skills/hugging-face-datasets/scripts"
 
-# playwright-skill extras
-assert_file "skills/playwright-skill/package.json"
-assert_file "skills/playwright-skill/run.js"
-assert_file "skills/playwright-skill/API_REFERENCE.md"
-assert_dir  "skills/playwright-skill/lib"
-
 # scientific skills with references
 for s in alpha-vantage edgartools fred-economic-data hedgefundmonitor matplotlib networkx plotly polars pymc scikit-learn seaborn shap statistical-analysis statsmodels sympy; do
   assert_dir "skills/$s/references"
@@ -114,29 +107,25 @@ for s in fred-economic-data matplotlib exploratory-data-analysis; do
   assert_dir "skills/$s/scripts"
 done
 
-# commands
+# commands (4)
 assert_file "commands/orchestrate.md"
+assert_file "commands/telegram.md"
+assert_file "commands/desktop.md"
+assert_file "commands/update.md"
 
-# plugins
-assert_file "plugins/known_marketplaces.json"
-assert_json "plugins/known_marketplaces.json"
-
-# marketplace repos cloned (9 total)
-assert_dir "plugins/marketplaces/claude-plugins-official"
-assert_dir "plugins/marketplaces/superpowers-marketplace"
-assert_dir "plugins/marketplaces/mgrep"
-assert_dir "plugins/marketplaces/skills"
-assert_dir "plugins/marketplaces/claude-code-tips"
-assert_dir "plugins/marketplaces/claude-night-market"
-assert_dir "plugins/marketplaces/cc-marketplace"
-assert_dir "plugins/marketplaces/claude-mem"
-assert_dir "plugins/marketplaces/claude-notifications-go"
+# hooks
+assert_file "hooks/config-protection.sh"
+assert "config-protection is executable" test -x "$FAKE_HOME/.claude/hooks/config-protection.sh"
+assert_file "hooks/interface-guard.sh"
+assert "interface-guard is executable" test -x "$FAKE_HOME/.claude/hooks/interface-guard.sh"
+assert_file "hooks/prompt-injection-defender/post-tool-defender.py"
+assert_file "hooks/prompt-injection-defender/patterns.yaml"
 
 # settings.json content checks
 assert "settings has hooks" python3 -c "import json; d=json.load(open('$FAKE_HOME/.claude/settings.json')); assert 'hooks' in d"
 assert "settings has permissions" python3 -c "import json; d=json.load(open('$FAKE_HOME/.claude/settings.json')); assert 'permissions' in d"
 assert "settings has env" python3 -c "import json; d=json.load(open('$FAKE_HOME/.claude/settings.json')); assert 'env' in d"
-assert "settings has 15 plugins" python3 -c "import json; d=json.load(open('$FAKE_HOME/.claude/settings.json')); assert len(d['enabledPlugins']) == 15"
+assert "settings has 11 plugins" python3 -c "import json; d=json.load(open('$FAKE_HOME/.claude/settings.json')); assert len(d['enabledPlugins']) == 11, f'got {len(d[\"enabledPlugins\"])}'"
 assert "settings has extraKnownMarketplaces" python3 -c "import json; d=json.load(open('$FAKE_HOME/.claude/settings.json')); assert 'extraKnownMarketplaces' in d"
 assert "settings has statusLine" python3 -c "import json; d=json.load(open('$FAKE_HOME/.claude/settings.json')); assert 'statusLine' in d"
 

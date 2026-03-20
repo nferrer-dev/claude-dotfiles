@@ -4,71 +4,55 @@
       "source": "github",
       "repo": "anthropics/claude-plugins-official"
     },
-    "installLocation": "~/.claude/plugins/marketplaces/claude-plugins-official",
-    "lastUpdated": "2026-02-01T09:04:01.524Z"
+    "installLocation": "~/.claude/plugins/marketplaces/claude-plugins-official"
   },
   "superpowers-marketplace": {
     "source": {
       "source": "github",
       "repo": "obra/superpowers-marketplace"
     },
-    "installLocation": "~/.claude/plugins/marketplaces/superpowers-marketplace",
-    "lastUpdated": "2026-01-31T01:19:08.556Z"
-  },
-  "Mixedbread-Grep": {
-    "source": {
-      "source": "github",
-      "repo": "mixedbread-ai/mgrep"
-    },
-    "installLocation": "~/.claude/plugins/marketplaces/Mixedbread-Grep",
-    "lastUpdated": "2026-01-31T02:10:58.339Z"
+    "installLocation": "~/.claude/plugins/marketplaces/superpowers-marketplace"
   },
   "trailofbits": {
     "source": {
       "source": "github",
       "repo": "trailofbits/skills"
     },
-    "installLocation": "~/.claude/plugins/marketplaces/trailofbits",
-    "lastUpdated": "2026-01-31T02:53:03.698Z"
+    "installLocation": "~/.claude/plugins/marketplaces/trailofbits"
   },
   "ykdojo": {
     "source": {
       "source": "github",
       "repo": "ykdojo/claude-code-tips"
     },
-    "installLocation": "~/.claude/plugins/marketplaces/ykdojo",
-    "lastUpdated": "2026-01-31T03:09:08.950Z"
+    "installLocation": "~/.claude/plugins/marketplaces/ykdojo"
   },
   "claude-night-market": {
     "source": {
       "source": "github",
       "repo": "athola/claude-night-market"
     },
-    "installLocation": "~/.claude/plugins/marketplaces/claude-night-market",
-    "lastUpdated": "2026-01-31T03:30:04.367Z"
+    "installLocation": "~/.claude/plugins/marketplaces/claude-night-market"
   },
   "cc-marketplace": {
     "source": {
       "source": "github",
       "repo": "kenryu42/cc-marketplace"
     },
-    "installLocation": "~/.claude/plugins/marketplaces/cc-marketplace",
-    "lastUpdated": "2026-03-17T04:40:56.697Z"
-  },
-  "thedotmack": {
-    "source": {
-      "source": "github",
-      "repo": "thedotmack/claude-mem"
-    },
-    "installLocation": "~/.claude/plugins/marketplaces/thedotmack",
-    "lastUpdated": "2026-03-17T04:41:16.363Z"
+    "installLocation": "~/.claude/plugins/marketplaces/cc-marketplace"
   },
   "claude-notifications-go": {
     "source": {
       "source": "github",
       "repo": "777genius/claude-notifications-go"
     },
-    "installLocation": "~/.claude/plugins/marketplaces/claude-notifications-go",
-    "lastUpdated": "2026-03-17T04:47:41.206Z"
+    "installLocation": "~/.claude/plugins/marketplaces/claude-notifications-go"
+  },
+  "gmickel-claude-marketplace": {
+    "source": {
+      "source": "github",
+      "repo": "gmickel/gmickel-claude-marketplace"
+    },
+    "installLocation": "~/.claude/plugins/marketplaces/gmickel-claude-marketplace"
   }
 }
