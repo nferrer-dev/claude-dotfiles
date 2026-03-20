@@ -225,7 +225,8 @@ class PsmuxSession:
             return True
         if "ctrl+" in line.lower() or "Press up" in line:
             return True
-        if line.startswith("Opus") or line.startswith(os.environ.get("USER", "")):
+        username = os.environ.get("USERNAME", os.environ.get("USER", ""))
+        if line.startswith("Opus") or (username and line.startswith(username)):
             return True
         if "effort" in line and "/" in line:
             return True
