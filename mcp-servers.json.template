@@ -26,7 +26,7 @@
       "command": "cmd",
       "args": ["/c", "npx", "-y", "context-mode"],
       "env": {
-        "PATH": "C:\\Program Files\\nodejs;C:\\WINDOWS\\system32;C\\WINDOWS;C:\\Program Files\\Git\\cmd"
+        "PATH": "C:\\Program Files\\nodejs;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\Program Files\\Git\\cmd"
       }
     },
     "chrome-devtools": {
