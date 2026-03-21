@@ -1,7 +1,12 @@
 #!/bin/bash
 # Stop hook — writes Claude's response to a signal file for the Telegram bot.
-# Uses nonce protocol: bot writes {"nonce":"xxx","status":"waiting"},
-# this hook writes {"nonce":"xxx","status":"done","response":"..."}.
+# ONLY fires inside psmux sessions (not desktop Claude Code).
+
+# Check if we're inside a psmux/tmux session
+# psmux sets TMUX environment variable when inside a session
+if [ -z "$TMUX" ]; then
+  exit 0
+fi
 
 INPUT=$(cat)
 RESPONSE=$(echo "$INPUT" | jq -r '.last_assistant_message // ""')
@@ -37,35 +42,25 @@ fi
 
 SIGNAL_FILE="$HOME/.claude/tg-signal-${SESSION_NAME}.json"
 
-# Only write if signal file exists and contains a waiting nonce
 if [ ! -f "$SIGNAL_FILE" ]; then
   exit 0
 fi
 
-# Read the nonce from the waiting signal
-NONCE=$(python3 -c "
+# Read nonce and write response
+python3 -c "
 import json, sys
 try:
     data = json.loads(open(sys.argv[1]).read())
-    if data.get('status') == 'waiting':
-        print(data.get('nonce', ''))
+    if data.get('status') != 'waiting':
+        sys.exit(0)
+    nonce = data.get('nonce', '')
+    if not nonce:
+        sys.exit(0)
+    out = {'nonce': nonce, 'status': 'done', 'response': sys.argv[2]}
+    with open(sys.argv[1], 'w', encoding='utf-8') as f:
+        json.dump(out, f, ensure_ascii=False)
 except:
     pass
-" "$SIGNAL_FILE" 2>/dev/null)
-
-if [ -z "$NONCE" ]; then
-  exit 0
-fi
-
-# Write response with matching nonce
-python3 -c "
-import json, sys
-nonce = sys.argv[1]
-response = sys.argv[2]
-signal_file = sys.argv[3]
-data = {'nonce': nonce, 'status': 'done', 'response': response}
-with open(signal_file, 'w', encoding='utf-8') as f:
-    json.dump(data, f, ensure_ascii=False)
-" "$NONCE" "$RESPONSE" "$SIGNAL_FILE" 2>/dev/null
+" "$SIGNAL_FILE" "$RESPONSE" 2>/dev/null
 
 exit 0
