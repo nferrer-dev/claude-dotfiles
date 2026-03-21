@@ -40,30 +40,46 @@ class PsmuxSession:
         """Launch interactive Claude Code inside the psmux session."""
         cmd = f'cd /d "{self.cwd}" && "{CLAUDE}" --permission-mode {permission_mode}'
         self._send_keys(cmd)
-        # Wait for Claude to start (look for the prompt character)
-        for _ in range(30):
+        # Wait for Claude Code to start (look for Claude-specific indicators)
+        for _ in range(60):
             time.sleep(1)
             output = self.capture() or ""
-            if ">" in output or "Try" in output or "effort" in output:
+            # Claude Code shows these when ready — cmd prompt ">" is NOT sufficient
+            if "effort" in output or "───" in output or "\u276f" in output:
                 time.sleep(2)  # Let UI fully render before first capture
                 return True
         return False
 
     def send_message(self, text: str) -> None:
         """Send a user message to the Claude session."""
-        # Clear the signal file before sending
-        if self.signal_file.exists():
-            self.signal_file.unlink()
-        # Capture current state for diffing
+        # Write marker to signal file — the Stop hook only writes if marker present
+        self.signal_file.write_text("WAITING")
+        # Capture current state for permission prompt detection
         self._last_capture = self.capture() or ""
         # Inject the message
         self._send_keys(text)
+
+    def _read_signal_file(self) -> str:
+        """Read response from signal file if the Stop hook has written it."""
+        if not self.signal_file.exists():
+            return ""
+        try:
+            content = self.signal_file.read_text(encoding="utf-8").strip()
+            # "WAITING" means the hook hasn't written yet
+            if not content or content == "WAITING":
+                return ""
+            return content
+        except Exception:
+            return ""
 
     def wait_for_response(
         self, timeout: int = 120, poll_interval: float = 2.0,
         on_permission=None, on_progress=None,
     ) -> str:
-        """Wait for Claude to finish responding and return the new output.
+        """Wait for Claude to finish responding via signal file.
+
+        The Stop hook writes last_assistant_message to the signal file.
+        Capture-pane is used ONLY for permission prompt detection.
 
         Args:
             on_permission: Optional callback(details: dict) -> str.
@@ -71,20 +87,22 @@ class PsmuxSession:
                 Should return "y", "n", or "a" (approve always).
                 If None, permission prompts are ignored.
             on_progress: Optional callback(partial_text: str) -> None.
-                Called periodically with partial response text for streaming.
+                Not used (kept for API compatibility).
         """
         start = time.time()
-        last_output = ""
-        stable_count = 0
-        permission_handled = False
-        last_progress_text = ""
 
         while time.time() - start < timeout:
             time.sleep(poll_interval)
-            current = self.capture() or ""
 
-            # Check for permission prompt (only if callback provided)
-            if on_permission and not permission_handled:
+            # Check signal file — Stop hook writes clean response here
+            signal_response = self._read_signal_file()
+            if signal_response:
+                self.signal_file.write_text("")
+                return signal_response
+
+            # Check for permission prompt via capture-pane
+            if on_permission:
+                current = self.capture() or ""
                 perm = self.detect_permission_prompt(current)
                 if perm:
                     response = on_permission(perm)
@@ -94,35 +112,10 @@ class PsmuxSession:
                         self.deny_permission()
                     else:
                         self.approve_permission()
-                    # Reset state and continue waiting for final response
                     time.sleep(2)
-                    self._last_capture = self.capture() or ""
-                    stable_count = 0
-                    permission_handled = False
                     continue
 
-            # Stream partial output if callback provided
-            if on_progress and current != self._last_capture:
-                partial = self._extract_response(self._last_capture, current)
-                if partial and partial != last_progress_text and len(partial) > 5:
-                    on_progress(partial)
-                    last_progress_text = partial
-
-            # Check if output has stabilized (Claude finished responding)
-            # Look for the input prompt reappearing at the bottom
-            if self._has_prompt(current) and current != self._last_capture:
-                # Output has the prompt back = Claude is done
-                stable_count += 1
-                permission_handled = False
-                if stable_count >= 2:
-                    return self._extract_response(self._last_capture, current)
-            else:
-                stable_count = 0
-
-            last_output = current
-
-        # Timeout — return whatever we have
-        return self._extract_response(self._last_capture, last_output)
+        return ""
 
     def capture(self, lines: int = 100) -> str:
         """Capture current psmux pane content."""
@@ -225,8 +218,7 @@ class PsmuxSession:
             return True
         if "ctrl+" in line.lower() or "Press up" in line:
             return True
-        username = os.environ.get("USERNAME", os.environ.get("USER", ""))
-        if line.startswith("Opus") or (username and line.startswith(username)):
+        if line.startswith("Opus"):
             return True
         if "effort" in line and "/" in line:
             return True
