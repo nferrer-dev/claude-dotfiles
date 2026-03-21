@@ -98,6 +98,27 @@ def write_health():
     }))
 
 
+HANDOFF_FILE = Path.home() / ".claude" / "handoff-synopsis.txt"
+
+
+def _send_handoff_synopsis():
+    """Send handoff synopsis to Telegram if one exists, then delete it."""
+    if not HANDOFF_FILE.exists():
+        return
+    try:
+        synopsis = HANDOFF_FILE.read_text().strip()
+        if not synopsis:
+            return
+        config = load_sessions_config()
+        session_name = active_session_name or "unknown"
+        msg = f"[{session_name}] Desktop -> Telegram\n\n{synopsis}"
+        send_message(ALLOWED_USER_ID, msg)
+        HANDOFF_FILE.unlink()
+        log.info("Handoff synopsis sent to Telegram")
+    except Exception as e:
+        log.error(f"Failed to send handoff synopsis: {e}")
+
+
 # ── Telegram API ─────────────────────────────────────────────
 
 def api_call(method, payload=None):
@@ -466,9 +487,26 @@ def process_message(chat_id, text):
         return
 
     if text == "/desktop":
+        # Build synopsis from recent history across all active sessions
+        handoff_file = Path.home() / ".claude" / "handoff-synopsis.txt"
+        config = load_sessions_config()
+        synopsis_lines = ["Telegram -> Desktop\n"]
+        for sname in config:
+            if "parent" in config[sname]:
+                continue
+            entries = history.recent(sname, 10)
+            if entries:
+                synopsis_lines.append(f"#{sname}:")
+                for e in entries:
+                    prefix = ">" if e["role"] == "user" else "<"
+                    synopsis_lines.append(f"  {prefix} {e['text'][:120]}")
+                synopsis_lines.append("")
+        handoff_file.write_text("\n".join(synopsis_lines))
         set_mode("desktop")
-        send_message(chat_id, "Switched to desktop. Run /desktop in Claude Code.")
-        log.info("-> desktop")
+        send_message(chat_id,
+                     "Switched to desktop. Synopsis saved.\n"
+                     "Run /desktop in Claude Code to resume with context.")
+        log.info("-> desktop (synopsis saved)")
         return
 
     if text == "/queue":
@@ -881,6 +919,9 @@ def main():
                 log.info(f"Resuming worker for {session_name} ({pending[session_name]} pending)")
                 ensure_worker(session_name)
 
+    # Send handoff synopsis if switching from desktop
+    _send_handoff_synopsis()
+
     write_health()
     log.info("Polling...")
     offset = None
@@ -924,6 +965,7 @@ def main():
         if health_counter >= 10:
             health_counter = 0
             write_health()
+            _send_handoff_synopsis()
             queue.cleanup()
             history.cleanup()
             # Prune dead worker thread references
