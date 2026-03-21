@@ -24,7 +24,7 @@ SYNOPSIS_EOF
 python3 -c "
 import subprocess, sys, os
 from pathlib import Path
-bot_dir = Path.home() / 'OneDrive/Documents/Projects/claude-telegram-bot'
+bot_dir = Path.home() / '.claude/telegram-bot-local'
 pid_file = Path.home() / '.claude/telegram-bot.pid'
 # Check if already running
 if pid_file.exists():
@@ -38,10 +38,10 @@ if pid_file.exists():
         pass
 # Start new instance
 subprocess.Popen(
-    [sys.executable, '-u', 'bot.py'],
+    [sys.executable, '-B', '-u', 'bot.py'],
     cwd=str(bot_dir),
     creationflags=0x00000010,
-    env={**os.environ, 'PYTHONIOENCODING': 'utf-8'},
+    env={**os.environ, 'PYTHONIOENCODING': 'utf-8', 'PYTHONDONTWRITEBYTECODE': '1'},
 )
 print('Bot started')
 "
