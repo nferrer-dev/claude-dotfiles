@@ -1,12 +1,7 @@
 #!/bin/bash
 # Stop hook — writes Claude's response to a signal file for the Telegram bot.
-# ONLY fires inside psmux sessions (not desktop Claude Code).
-
-# Check if we're inside a psmux/tmux session
-# psmux sets TMUX environment variable when inside a session
-if [ -z "$TMUX" ]; then
-  exit 0
-fi
+# Uses nonce protocol. Only fires for sessions whose cwd matches a registered
+# Telegram session (the bot uses a unique cwd to avoid desktop conflicts).
 
 INPUT=$(cat)
 RESPONSE=$(echo "$INPUT" | jq -r '.last_assistant_message // ""')
@@ -46,7 +41,6 @@ if [ ! -f "$SIGNAL_FILE" ]; then
   exit 0
 fi
 
-# Read nonce and write response
 python3 -c "
 import json, sys
 try:
