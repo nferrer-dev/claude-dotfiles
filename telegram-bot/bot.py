@@ -943,12 +943,14 @@ def main():
         if not updates:
             time.sleep(2)
 
+        # Check for handoff synopsis on every cycle (immediate delivery)
+        _send_handoff_synopsis()
+
         # Write health heartbeat every ~30s (every 10 poll cycles)
         health_counter += 1
         if health_counter >= 10:
             health_counter = 0
             write_health()
-            _send_handoff_synopsis()
             queue.cleanup()
             history.cleanup()
             # Prune dead worker thread references
