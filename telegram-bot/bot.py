@@ -30,7 +30,16 @@ from core.worktree import (
     merge_branch, delete_branch, BRANCH_PREFIX,
 )
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+LOG_FILE = Path.home() / ".claude" / "telegram-bot.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(message)s",
+    datefmt="%H:%M:%S",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(str(LOG_FILE), encoding="utf-8"),
+    ],
+)
 log = logging.getLogger("bot")
 SESSIONS_FILE = Path.home() / ".claude" / "telegram-sessions.json"
 
