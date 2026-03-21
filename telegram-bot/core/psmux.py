@@ -58,7 +58,8 @@ class PsmuxSession:
         # Generate unique nonce for this request
         self._current_nonce = uuid.uuid4().hex[:8]
         # Write nonce to signal file — Stop hook echoes it back with the response
-        signal = json.dumps({"nonce": self._current_nonce, "status": "waiting"})
+        # Include session_name so the hook can verify the source psmux session
+        signal = json.dumps({"nonce": self._current_nonce, "status": "waiting", "session": self.name})
         self.signal_file.write_text(signal)
         log.info(f"[{self.name}] Signal file: nonce={self._current_nonce}")
         # Inject the message
