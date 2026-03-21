@@ -27,7 +27,17 @@
       "TaskList(*)",
       "TaskOutput(*)",
       "TaskStop(*)",
-      "TaskUpdate(*)"
+      "TaskUpdate(*)",
+      "mcp__*",
+      "EnterPlanMode",
+      "ExitPlanMode",
+      "EnterWorktree",
+      "ExitWorktree",
+      "CronCreate(*)",
+      "CronDelete(*)",
+      "CronList",
+      "ListMcpResourcesTool(*)",
+      "ReadMcpResourceTool(*)"
     ],
     "deny": [
       "Bash(rm -rf *)",

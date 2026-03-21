@@ -6,7 +6,7 @@ My [Claude Code](https://docs.anthropic.com/en/docs/claude-code) configuration â
 
 ### Settings (`settings.json`)
 - 55 deny rules (destructive ops, credential files, force pushes, device access)
-- 20 allow rules for power-user workflow
+- 30 allow rules for autonomous operation (all tools + MCP + plan mode + worktrees)
 - Agent teams enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`)
 - Effort level locked to `high`
 - Statusline with token/cost/git info
