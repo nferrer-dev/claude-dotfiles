@@ -819,31 +819,13 @@ def session_worker(session_name: str):
                 send_message(chat_id, f"[{session_name}] Failed to start session.")
                 continue
 
-            # Send a "working" message that we'll update with streaming output
-            stream_msg_id = send_message(chat_id, f"[{session_name}] Working...")
-
-            # Streaming progress callback
-            last_stream_time = [0.0]
-
-            def on_stream(partial_text):
-                now = time.time()
-                if now - last_stream_time[0] < STREAM_INTERVAL:
-                    return
-                last_stream_time[0] = now
-                preview = partial_text[:MAX_MESSAGE_LENGTH - 50]
-                if stream_msg_id:
-                    edit_message_text(
-                        chat_id, stream_msg_id,
-                        f"[{session_name}] ...streaming...\n\n{preview}",
-                    )
-
+            send_typing(chat_id)
             on_perm = make_permission_handler(session_name, chat_id)
 
             session.send_message(prompt)
             response = session.wait_for_response(
                 RESPONSE_TIMEOUT, RESPONSE_POLL_INTERVAL,
                 on_permission=on_perm,
-                on_progress=on_stream,
             )
             if not response or not response.strip():
                 response = "(No response captured)"
@@ -852,16 +834,8 @@ def session_worker(session_name: str):
             history.add(session_name, "assistant", response)
             log.info(f"[{session_name}] #{msg_id} -> {response[:60]}...")
 
-            # Replace the streaming message with the final response
-            final_text = f"[{session_name}] {response}"
-            if stream_msg_id and len(final_text) <= MAX_MESSAGE_LENGTH:
-                edit_message_text(chat_id, stream_msg_id, final_text)
-            else:
-                # Too long for edit — send as new message(s)
-                if stream_msg_id:
-                    edit_message_text(chat_id, stream_msg_id,
-                                     f"[{session_name}] Done. Full response below.")
-                send_message(chat_id, final_text)
+            # Send the response
+            send_message(chat_id, f"[{session_name}] {response}")
 
         except Exception as e:
             log.error(f"[{session_name}] Worker error: {e}", exc_info=True)
