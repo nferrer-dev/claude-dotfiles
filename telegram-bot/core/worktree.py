@@ -116,8 +116,20 @@ def diff_stat(repo_path: str, branch: str) -> str:
     return "Could not diff (no main/master branch found)."
 
 
+def checkout_main(repo_path: str) -> tuple[bool, str]:
+    """Ensure repo is on main or master branch before merging."""
+    for branch in ("main", "master"):
+        r = _git(repo_path, "checkout", branch)
+        if r.returncode == 0:
+            return True, branch
+    return False, "Could not checkout main or master"
+
+
 def merge_branch(repo_path: str, branch: str) -> tuple[bool, str]:
-    """Merge branch into current branch (should be main)."""
+    """Merge branch into main (checks out main/master first)."""
+    ok, base = checkout_main(repo_path)
+    if not ok:
+        return False, base
     r = _git(repo_path, "merge", branch, "--no-ff",
              "-m", f"Merge {branch} (parallel task)")
     if r.returncode != 0:

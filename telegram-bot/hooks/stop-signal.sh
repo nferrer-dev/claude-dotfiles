@@ -26,7 +26,7 @@ except:
     sys.exit(0)
 for name, info in sessions.items():
     scwd = info.get('cwd', '').replace('\\\\', '/').rstrip('/')
-    if scwd.lower() == cwd.lower():
+    if scwd == cwd:
         print(name)
         break
 " "$CWD" 2>/dev/null)
@@ -41,20 +41,23 @@ if [ ! -f "$SIGNAL_FILE" ]; then
   exit 0
 fi
 
-python3 -c "
+# Pipe response via stdin to avoid ARG_MAX limits on long responses
+# Use printf to avoid shell expansion of $, backticks, ! in response
+printf '%s' "$RESPONSE" | python3 -c "
 import json, sys
 try:
+    response = sys.stdin.read()
     data = json.loads(open(sys.argv[1]).read())
     if data.get('status') != 'waiting':
         sys.exit(0)
     nonce = data.get('nonce', '')
     if not nonce:
         sys.exit(0)
-    out = {'nonce': nonce, 'status': 'done', 'response': sys.argv[2]}
+    out = {'nonce': nonce, 'status': 'done', 'response': response}
     with open(sys.argv[1], 'w', encoding='utf-8') as f:
         json.dump(out, f, ensure_ascii=False)
 except:
     pass
-" "$SIGNAL_FILE" "$RESPONSE" 2>/dev/null
+" "$SIGNAL_FILE" 2>/dev/null
 
 exit 0
