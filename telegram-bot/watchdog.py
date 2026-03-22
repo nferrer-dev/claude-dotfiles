@@ -8,10 +8,13 @@ Or run continuously:
 """
 
 import json
+import os
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+IS_WINDOWS = sys.platform == "win32"
 
 BOT_DIR = Path(__file__).parent
 HEALTH_FILE = Path.home() / ".claude" / "telegram-bot-health.json"
@@ -19,6 +22,8 @@ PID_FILE = Path.home() / ".claude" / "telegram-bot.pid"
 BOT_SCRIPT = BOT_DIR / "bot.py"
 STALE_THRESHOLD = 120  # seconds before health is considered stale
 CHECK_INTERVAL = 60    # seconds between checks in loop mode
+MAX_UNHEALTHY_CHECKS = 3  # kill bot after this many consecutive unhealthy checks
+_unhealthy_count = 0
 
 
 def is_bot_healthy() -> bool:
@@ -33,18 +38,25 @@ def is_bot_healthy() -> bool:
 
 
 def is_pid_alive(pid: int) -> bool:
-    try:
-        r = subprocess.run(
-            ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
-            capture_output=True, text=True, timeout=10,
-        )
-        for line in r.stdout.strip().split("\n"):
-            parts = line.split()
-            if len(parts) >= 2 and parts[1] == str(pid):
-                return True
-        return False
-    except Exception:
-        return False
+    if IS_WINDOWS:
+        try:
+            r = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                capture_output=True, text=True, timeout=10,
+            )
+            for line in r.stdout.strip().split("\n"):
+                parts = line.split()
+                if len(parts) >= 2 and parts[1] == str(pid):
+                    return True
+            return False
+        except Exception:
+            return False
+    else:
+        try:
+            os.kill(pid, 0)
+            return True
+        except (ProcessLookupError, PermissionError):
+            return False
 
 
 def is_bot_running() -> bool:
@@ -58,11 +70,12 @@ def is_bot_running() -> bool:
 
 
 def start_bot():
-    subprocess.Popen(
-        [sys.executable, str(BOT_SCRIPT)],
-        cwd=str(BOT_DIR),
-        creationflags=subprocess.CREATE_NEW_CONSOLE,
-    )
+    kwargs = {"cwd": str(BOT_DIR)}
+    if IS_WINDOWS:
+        kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
+    else:
+        kwargs["start_new_session"] = True
+    subprocess.Popen([sys.executable, str(BOT_SCRIPT)], **kwargs)
     # Don't write PID — the bot writes its own on startup.
     # Write a grace marker so we don't restart again before the bot starts.
     HEALTH_FILE.write_text(json.dumps({
@@ -72,12 +85,40 @@ def start_bot():
     print("[watchdog] Started bot, grace period active")
 
 
+def kill_bot():
+    """Kill the bot process via PID file."""
+    if not PID_FILE.exists():
+        return
+    try:
+        pid = int(PID_FILE.read_text().strip())
+        os.kill(pid, 15)  # SIGTERM
+        time.sleep(2)
+        try:
+            os.kill(pid, 9)  # SIGKILL if still alive
+        except ProcessLookupError:
+            pass
+        print(f"[watchdog] Killed hung bot (PID {pid})")
+    except (ProcessLookupError, PermissionError, ValueError):
+        pass
+
+
 def check_and_restart():
+    global _unhealthy_count
     if is_bot_healthy():
+        _unhealthy_count = 0
         return
     if is_bot_running():
-        print("[watchdog] Bot running but unhealthy — waiting for recovery")
+        _unhealthy_count += 1
+        if _unhealthy_count >= MAX_UNHEALTHY_CHECKS:
+            print(f"[watchdog] Bot unhealthy for {_unhealthy_count} checks — killing")
+            kill_bot()
+            _unhealthy_count = 0
+            time.sleep(3)
+            start_bot()
+        else:
+            print(f"[watchdog] Bot running but unhealthy ({_unhealthy_count}/{MAX_UNHEALTHY_CHECKS})")
         return
+    _unhealthy_count = 0
     print("[watchdog] Bot not running, starting...")
     start_bot()
 

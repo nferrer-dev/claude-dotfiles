@@ -5,8 +5,10 @@ parallel execution via git worktrees, streaming responses,
 rate limiting, error recovery, health heartbeat.
 """
 
+import hashlib
 import json
 import logging
+import logging.handlers
 import os
 import re
 import sys
@@ -17,10 +19,10 @@ from pathlib import Path
 import requests
 
 from config import (
-    BOT_TOKEN, ALLOWED_USER_ID, MODE_FILE, API_URL,
+    BOT_TOKEN, ALLOWED_USER_ID, MODE_FILE, API_URL, IS_WINDOWS,
     MAX_MESSAGE_LENGTH, RESPONSE_TIMEOUT, RESPONSE_POLL_INTERVAL,
     PERMISSION_TIMEOUT, RATE_LIMIT_SECONDS, MAX_QUEUE_SIZE,
-    STREAM_INTERVAL, HEALTH_FILE, STALE_PROCESSING_SECONDS,
+    HEALTH_FILE, STALE_PROCESSING_SECONDS,
 )
 from core.psmux import PsmuxSession, list_sessions
 from core.queue import MessageQueue, SessionHistory, init_db
@@ -37,7 +39,10 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler(str(LOG_FILE), encoding="utf-8"),
+        logging.handlers.RotatingFileHandler(
+            str(LOG_FILE), encoding="utf-8",
+            maxBytes=5 * 1024 * 1024, backupCount=3,
+        ),
     ],
 )
 log = logging.getLogger("bot")
@@ -45,10 +50,6 @@ SESSIONS_FILE = Path.home() / ".claude" / "telegram-sessions.json"
 
 # Persistent HTTP session for reliable TLS
 http = requests.Session()
-try:
-    http.get(f"{API_URL}/getMe", timeout=5)
-except Exception:
-    pass
 
 # ── Session State ────────────────────────────────────────────
 
@@ -57,9 +58,28 @@ active_session_name: str = None
 queue = MessageQueue()
 history = SessionHistory()
 session_workers: dict[str, threading.Thread] = {}
-yolo_sessions: set[str] = set()
-parallel_sessions: set[str] = set()
 last_message_time: dict[str, float] = {}  # session_name -> timestamp
+
+# Persistent mode sets — saved/loaded from disk
+_MODES_FILE = Path.home() / ".claude" / "telegram-bot-modes.json"
+
+
+def _load_modes() -> tuple[set, set]:
+    try:
+        data = json.loads(_MODES_FILE.read_text())
+        return set(data.get("yolo", [])), set(data.get("parallel", []))
+    except Exception:
+        return set(), set()
+
+
+def _save_modes():
+    _MODES_FILE.write_text(json.dumps({
+        "yolo": list(yolo_sessions),
+        "parallel": list(parallel_sessions),
+    }))
+
+
+yolo_sessions, parallel_sessions = _load_modes()
 
 # Thread synchronization
 worker_lock = threading.Lock()
@@ -76,7 +96,9 @@ def load_sessions_config() -> dict:
 
 
 def save_sessions_config(config: dict):
-    SESSIONS_FILE.write_text(json.dumps(config, indent=2))
+    tmp = SESSIONS_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(config, indent=2))
+    tmp.replace(SESSIONS_FILE)
 
 
 def get_mode() -> str:
@@ -118,11 +140,11 @@ def _send_handoff_synopsis():
         synopsis = HANDOFF_FILE.read_text().strip()
         if not synopsis:
             return
-        config = load_sessions_config()
         session_name = active_session_name or "unknown"
         msg = f"[{session_name}] Desktop -> Telegram\n\n{synopsis}"
-        send_message(ALLOWED_USER_ID, msg)
-        HANDOFF_FILE.unlink()
+        msg_id = send_message(ALLOWED_USER_ID, msg)
+        if msg_id:
+            HANDOFF_FILE.unlink()
         log.info("Handoff synopsis sent to Telegram")
     except Exception as e:
         log.error(f"Failed to send handoff synopsis: {e}")
@@ -151,20 +173,39 @@ def api_call(method, payload=None):
     return {}
 
 
+def _chunk_text(text, max_len):
+    """Split text into chunks at line boundaries, respecting max_len."""
+    chunks = []
+    while len(text) > max_len:
+        # Try to split at last newline within limit
+        split_at = text.rfind("\n", 0, max_len)
+        if split_at <= 0:
+            # No newline found — split at last space
+            split_at = text.rfind(" ", 0, max_len)
+        if split_at <= 0:
+            # No space found — hard split as last resort
+            split_at = max_len
+        chunks.append(text[:split_at])
+        text = text[split_at:].lstrip("\n")
+    if text:
+        chunks.append(text)
+    return chunks
+
+
 def send_message(chat_id, text, reply_markup=None):
-    result = None
-    for i in range(0, len(text), MAX_MESSAGE_LENGTH):
+    first_msg_id = None
+    chunks = _chunk_text(text, MAX_MESSAGE_LENGTH)
+    for idx, chunk in enumerate(chunks):
         payload = {
             "chat_id": chat_id,
-            "text": text[i:i + MAX_MESSAGE_LENGTH],
+            "text": chunk,
         }
-        if reply_markup and i == 0:
+        if reply_markup and idx == 0:
             payload["reply_markup"] = reply_markup
         result = api_call("sendMessage", payload)
-    # Return message_id of the last sent chunk (useful for streaming edits)
-    if result and result.get("ok"):
-        return result["result"]["message_id"]
-    return None
+        if first_msg_id is None and result and result.get("ok"):
+            first_msg_id = result["result"]["message_id"]
+    return first_msg_id
 
 
 def send_typing(chat_id):
@@ -201,8 +242,12 @@ def get_updates(offset=None):
         payload["offset"] = offset
     try:
         r = http.post(f"{API_URL}/getUpdates", json=payload, timeout=35)
-        return r.json().get("result", [])
-    except Exception:
+        data = r.json()
+        if not data.get("ok"):
+            log.warning(f"getUpdates failed: {data.get('description', 'unknown')}")
+        return data.get("result", [])
+    except Exception as e:
+        log.error(f"getUpdates exception: {e}")
         return []
 
 
@@ -217,7 +262,7 @@ def get_or_create_session(name: str) -> PsmuxSession:
     if name not in config:
         return None
 
-    cwd = config[name].get("cwd", r"C:\Windows\System32")
+    cwd = config[name].get("cwd", r"C:\Windows\System32" if IS_WINDOWS else str(Path.home()))
     session = PsmuxSession(name, cwd)
 
     if not session.is_alive():
@@ -256,16 +301,40 @@ def format_sessions() -> str:
 
 # ── Permission Handling (HITL) ──────────────────────────────
 
+_callback_session_map: dict[str, str] = {}  # short_key -> full session_name
+
+def _callback_key(session_name: str) -> str:
+    """Return a key for callback_data that fits in Telegram's 64-byte limit.
+
+    For short names, returns the name directly. For long names, uses a
+    truncated hash and stores a mapping for lookup.
+    """
+    # Longest prefix is "perm:yolo:" (10 chars), leaving 54 for the key
+    if len(session_name) <= 54:
+        return session_name
+    short = session_name[:46] + hashlib.md5(
+        session_name.encode(), usedforsecurity=False
+    ).hexdigest()[:8]
+    _callback_session_map[short] = session_name
+    return short
+
+
+def _resolve_callback_session(key: str) -> str:
+    """Resolve a callback key back to the full session name."""
+    return _callback_session_map.get(key, key)
+
+
 def make_permission_keyboard(session_name: str) -> dict:
+    key = _callback_key(session_name)
     return {
         "inline_keyboard": [
             [
-                {"text": "Approve", "callback_data": f"perm:y:{session_name}"},
-                {"text": "Deny", "callback_data": f"perm:n:{session_name}"},
+                {"text": "Approve", "callback_data": f"perm:y:{key}"},
+                {"text": "Deny", "callback_data": f"perm:n:{key}"},
             ],
             [
-                {"text": "Approve All (session)", "callback_data": f"perm:a:{session_name}"},
-                {"text": "YOLO mode", "callback_data": f"perm:yolo:{session_name}"},
+                {"text": "Approve All (session)", "callback_data": f"perm:a:{key}"},
+                {"text": "YOLO mode", "callback_data": f"perm:yolo:{key}"},
             ],
         ]
     }
@@ -287,11 +356,12 @@ def handle_permission_callback(callback_query):
         return
 
     action = parts[1]
-    session_name = parts[2]
+    session_name = _resolve_callback_session(parts[2])
 
     if action == "yolo":
         # Enable YOLO mode — restart session with auto permissions
         yolo_sessions.add(session_name)
+        _save_modes()
         # Auto-approve current prompt
         with permission_lock:
             permission_results[session_name] = "y"
@@ -438,6 +508,13 @@ def process_message(chat_id, text):
         if name in active_psmux:
             active_psmux[name].kill()
             active_psmux.pop(name, None)
+        with worker_lock:
+            session_workers.pop(name, None)
+        if active_session_name == name:
+            config = load_sessions_config()
+            parents = [n for n, i in config.items()
+                       if "parent" not in i and n != name]
+            active_session_name = parents[-1] if parents else None
         send_message(chat_id, f"Closed: #{name}")
         return
 
@@ -449,6 +526,9 @@ def process_message(chat_id, text):
         name, path = parts[1], parts[2].strip().strip('"')
         if not re.match(r'^[a-zA-Z0-9_-]+$', name):
             send_message(chat_id, "Invalid name. Use only letters, numbers, - and _")
+            return
+        if len(name) > 40:
+            send_message(chat_id, "Name too long (max 40 chars).")
             return
         p = Path(path)
         if not p.is_absolute() or not p.exists() or not p.is_dir():
@@ -471,6 +551,7 @@ def process_message(chat_id, text):
             return
         if name in yolo_sessions:
             yolo_sessions.discard(name)
+            _save_modes()
             # Restart session with default permissions
             if name in active_psmux:
                 active_psmux[name].kill()
@@ -483,6 +564,12 @@ def process_message(chat_id, text):
             log.info(f"[{name}] YOLO disabled")
         else:
             yolo_sessions.add(name)
+            _save_modes()
+            # Unblock any pending permission wait for this session
+            with permission_lock:
+                permission_results[name] = "y"
+                if name in permission_events:
+                    permission_events[name].set()
             # Restart session with auto permissions
             if name in active_psmux:
                 active_psmux[name].kill()
@@ -580,9 +667,11 @@ def process_message(chat_id, text):
                 send_message(chat_id, f"#{name} is not a git repo. Parallel mode requires git.")
                 return
             parallel_sessions.add(name)
+            _save_modes()
             send_message(chat_id, f"Parallel mode ON for #{name}. Each message spawns a worktree.")
         else:
             parallel_sessions.discard(name)
+            _save_modes()
             send_message(chat_id, f"Parallel mode OFF for #{name}. Messages route to main session.")
         return
 
@@ -733,7 +822,11 @@ def process_message(chat_id, text):
     if not target:
         target = active_session_name
     if not target:
-        if config:
+        parents = [n for n, i in config.items() if "parent" not in i]
+        if parents:
+            target = parents[-1]
+            active_session_name = target
+        elif config:
             target = list(config.keys())[-1]
             active_session_name = target
         else:
@@ -773,8 +866,11 @@ def process_message(chat_id, text):
     history.add(target, "user", prompt)
     log.info(f"[{target}] Queued #{msg_id}: {prompt[:60]}... ({pending} ahead)")
 
+    send_typing(chat_id)
     if pending > 0:
-        send_message(chat_id, f"Queued ({pending} ahead)")
+        send_message(chat_id, f"[{target}] Queued ({pending} ahead)")
+    else:
+        send_message(chat_id, f"[{target}] Processing...")
 
     # Ensure worker is running for this session
     ensure_worker(target)
@@ -810,10 +906,12 @@ def session_worker(session_name: str):
 
             session = get_or_create_session(session_name)
             if not session:
-                # Try once more — session may have died
-                log.warning(f"[{session_name}] Session dead, retrying...")
-                active_psmux.pop(session_name, None)
-                session = get_or_create_session(session_name)
+                # Retry only if session is in config (psmux may have died)
+                config = load_sessions_config()
+                if session_name in config:
+                    log.warning(f"[{session_name}] Session dead, retrying...")
+                    active_psmux.pop(session_name, None)
+                    session = get_or_create_session(session_name)
             if not session:
                 queue.fail(msg_id, "Failed to start session")
                 send_message(chat_id, f"[{session_name}] Failed to start session.")
@@ -822,10 +920,14 @@ def session_worker(session_name: str):
             send_typing(chat_id)
             on_perm = make_permission_handler(session_name, chat_id)
 
+            def on_progress(elapsed, _cid=chat_id):
+                send_typing(_cid)
+
             session.send_message(prompt)
             response = session.wait_for_response(
                 RESPONSE_TIMEOUT, RESPONSE_POLL_INTERVAL,
                 on_permission=on_perm,
+                on_progress=on_progress,
             )
             if not response or not response.strip():
                 response = "(No response captured)"
@@ -847,8 +949,10 @@ def session_worker(session_name: str):
                                  f"[{session_name}] Error: {e}")
             except Exception:
                 pass
-            # If session died, clear it so it gets recreated
-            active_psmux.pop(session_name, None)
+            # Only clear psmux session if it's actually dead
+            if session_name in active_psmux:
+                if not active_psmux[session_name].is_alive():
+                    active_psmux.pop(session_name, None)
             time.sleep(2)
 
 
@@ -875,11 +979,48 @@ def main():
 
     log.info("Claude Telegram Bot starting...")
 
-    # Write PID file for watchdog
+    # Single-instance guard: kill any existing bot process and verify
     pid_file = Path.home() / ".claude" / "telegram-bot.pid"
+    if pid_file.exists():
+        try:
+            old_pid = int(pid_file.read_text().strip())
+            if old_pid != os.getpid():
+                os.kill(old_pid, 0)  # check if alive
+                log.warning(f"Killing existing bot (PID {old_pid})")
+                os.kill(old_pid, 15)  # SIGTERM
+                for _ in range(10):
+                    time.sleep(0.5)
+                    try:
+                        os.kill(old_pid, 0)
+                    except ProcessLookupError:
+                        break
+                else:
+                    # Still alive after 5s — SIGKILL
+                    try:
+                        os.kill(old_pid, 9)
+                        time.sleep(1)
+                        os.kill(old_pid, 0)
+                        log.error(f"Failed to kill PID {old_pid} — exiting")
+                        sys.exit(1)
+                    except ProcessLookupError:
+                        pass
+                log.info(f"Old bot (PID {old_pid}) terminated")
+        except (ProcessLookupError, PermissionError, ValueError):
+            pass  # process already dead
+
+    # Write PID file
     pid_file.write_text(str(os.getpid()))
 
     init_db()
+
+    # Clean up orphaned signal files from previous crashes
+    for f in Path(Path.home() / ".claude").glob("tg-signal-*.json"):
+        try:
+            f.unlink()
+            log.info(f"Cleaned up stale signal file: {f.name}")
+        except Exception:
+            pass
+
     log.info(f"Mode: {get_mode()}")
 
     # Crash recovery: requeue messages stuck in 'processing'
